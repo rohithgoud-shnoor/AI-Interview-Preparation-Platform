@@ -1,0 +1,27 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { DashboardLayout } from './components/layout/DashboardLayout';
+import LandingPage from './pages/LandingPage';
+import Dashboard from './pages/Dashboard';
+import ResumeUpload from './pages/ResumeUpload';
+import MockInterview from './pages/MockInterview';
+import Analytics from './pages/Analytics';
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="resume" element={<ResumeUpload />} />
+          <Route path="interview" element={<MockInterview />} />
+          <Route path="analytics" element={<Analytics />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
