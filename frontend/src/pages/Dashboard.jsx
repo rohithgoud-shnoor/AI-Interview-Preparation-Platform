@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { authApi } from '../services/api';
 
 const data = [
   { name: 'May 12', score: 25 },
@@ -30,16 +31,9 @@ const Dashboard = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
       try {
-        const response = await fetch('http://localhost:8000/api/auth/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setName(data.name);
-          localStorage.setItem('user_name', data.name);
-        }
+        const data = await authApi.getMe(token);
+        setName(data.name);
+        localStorage.setItem('user_name', data.name);
       } catch (error) {
         console.error('Error fetching user info:', error);
       }

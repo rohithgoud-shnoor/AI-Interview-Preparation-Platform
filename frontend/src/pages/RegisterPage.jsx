@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Mail, Lock, User, ArrowRight, LogIn } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import { authApi } from '../services/api';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -15,26 +16,13 @@ const RegisterPage = () => {
   const handleGoogleLogin = async (response) => {
     const token = response.credential;
     try {
-      const res = await fetch('http://localhost:8000/api/auth/google', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('token', data.access_token);
-        localStorage.setItem('user_name', data.name);
-        navigate('/dashboard');
-      } else {
-        const errorData = await res.json();
-        alert(errorData.detail || 'Google sign-in failed');
-      }
+      const data = await authApi.googleLogin(token);
+      localStorage.setItem('token', data.access_token);
+      localStorage.setItem('user_name', data.name);
+      navigate('/dashboard');
     } catch (error) {
       console.error('Error logging in with Google:', error);
-      alert('Google login failed. Please try again.');
+      alert(error.message || 'Google login failed. Please try again.');
     }
   };
 
@@ -77,28 +65,12 @@ const RegisterPage = () => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:8000/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password
-        }),
-      });
-
-      if (response.ok) {
-        alert("Registration successful! Please sign in.");
-        navigate('/login');
-      } else {
-        const errorData = await response.json();
-        alert(errorData.detail || 'Registration failed');
-      }
+      await authApi.register(formData.name, formData.email, formData.password);
+      alert("Registration successful! Please sign in.");
+      navigate('/login');
     } catch (error) {
       console.error('Error registering:', error);
-      alert('Network error. Please try again later.');
+      alert(error.message || 'Network error. Please try again later.');
     }
   };
 
