@@ -6,12 +6,16 @@ import Dashboard from './pages/Dashboard';
 import ResumeUpload from './pages/ResumeUpload';
 import MockInterview from './pages/MockInterview';
 import Analytics from './pages/Analytics';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />

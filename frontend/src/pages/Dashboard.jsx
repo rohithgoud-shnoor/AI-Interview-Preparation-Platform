@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const data = [
@@ -23,10 +23,35 @@ const StatCard = ({ title, value, subtitle, subtitleColor }) => (
 );
 
 const Dashboard = () => {
+  const [name, setName] = useState(localStorage.getItem('user_name') || 'Candidate');
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      try {
+        const response = await fetch('http://localhost:8000/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setName(data.name);
+          localStorage.setItem('user_name', data.name);
+        }
+      } catch (error) {
+        console.error('Error fetching user info:', error);
+      }
+    };
+    fetchUser();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-slate-400 font-medium">Keep practicing and improve your skills!</p>
+        <h2 className="text-2xl font-bold text-white">Hello.. {name}</h2>
+        <p className="text-slate-400 font-medium mt-1">Keep practicing and improve your skills!</p>
       </div>
 
       {/* Top Stats Row */}

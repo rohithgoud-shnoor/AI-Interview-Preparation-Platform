@@ -38,12 +38,20 @@ const LandingPage = () => {
           <a href="#how-it-works" className="hover:text-white transition-colors">How it works</a>
           <a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a>
         </div>
-        <button 
-          onClick={() => navigate('/dashboard')}
-          className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-medium backdrop-blur-md transition-all"
-        >
-          Sign In
-        </button>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => navigate('/login')}
+            className="px-6 py-2.5 rounded-full hover:bg-white/10 text-white font-medium transition-all"
+          >
+            Sign In
+          </button>
+          <button 
+            onClick={() => navigate('/register')}
+            className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-medium backdrop-blur-md transition-all"
+          >
+            Register
+          </button>
+        </div>
       </nav>
 
       {/* Hero Section */}
@@ -66,7 +74,7 @@ const LandingPage = () => {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
             <button 
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/register')}
               className="w-full sm:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-primary to-secondary text-white font-semibold text-lg hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] transition-all flex items-center justify-center gap-2"
             >
               Start for free <ArrowRight className="w-5 h-5" />

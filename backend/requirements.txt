@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+python-jose
+python-dotenv
+pydantic
+bcrypt
+email-validator
+google-auth
+requests
