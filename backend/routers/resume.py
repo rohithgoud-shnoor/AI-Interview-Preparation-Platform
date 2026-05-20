@@ -248,7 +248,7 @@ def generate_questions(
 
     try:
         genai.configure(api_key=api_key)
-        gemini_model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+        gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
         model = genai.GenerativeModel(gemini_model)
         
         prompt = f"""
@@ -279,9 +279,15 @@ def generate_questions(
             
         return data
     except Exception as e:
+        err_msg = str(e)
+        if "429" in err_msg or "Quota exceeded" in err_msg or "ResourceExhausted" in err_msg:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="The AI is currently busy. You have exceeded your free tier rate limit. Please wait about 30 seconds and try again."
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate questions: {str(e)}"
+            detail=f"Failed to generate questions: {err_msg}"
         )
 
 @router.post("/feedback")
@@ -310,7 +316,7 @@ def get_feedback(
 
     try:
         genai.configure(api_key=api_key)
-        gemini_model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+        gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
         model = genai.GenerativeModel(gemini_model)
         
         prompt = f"""
@@ -357,7 +363,13 @@ def get_feedback(
         data = json.loads(response.text)
         return data
     except Exception as e:
+        err_msg = str(e)
+        if "429" in err_msg or "Quota exceeded" in err_msg or "ResourceExhausted" in err_msg:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="The AI is currently busy. You have exceeded your free tier rate limit. Please wait about 30 seconds and try again."
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate feedback: {str(e)}"
+            detail=f"Failed to generate feedback: {err_msg}"
         )
