@@ -2,9 +2,13 @@ from sqlalchemy.orm import Session
 import bcrypt
 import models, schemas
 
+import os
+
 def get_password_hash(password: str) -> str:
     pwd_bytes = password.encode('utf-8')
-    salt = bcrypt.gensalt()
+    # Default to 10 rounds on resource-constrained environments (like free tier)
+    rounds = int(os.getenv("BCRYPT_ROUNDS", "10"))
+    salt = bcrypt.gensalt(rounds=rounds)
     hashed = bcrypt.hashpw(pwd_bytes, salt)
     return hashed.decode('utf-8')
 

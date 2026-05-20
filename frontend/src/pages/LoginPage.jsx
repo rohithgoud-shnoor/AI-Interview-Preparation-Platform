@@ -8,17 +8,31 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
 
   const handleGoogleLogin = async (response) => {
     const token = response.credential;
+    setIsLoading(true);
+    setStatusMessage('Verifying credentials...');
+    
+    const wakingTimer = setTimeout(() => {
+      setStatusMessage('Render server is spinning up (this can take 1-2 minutes on the free tier)...');
+    }, 3000);
+
     try {
       const data = await authApi.googleLogin(token);
+      clearTimeout(wakingTimer);
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('user_name', data.name);
       navigate('/dashboard');
     } catch (error) {
+      clearTimeout(wakingTimer);
       console.error('Error logging in with Google:', error);
       alert(error.message || 'Google login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setStatusMessage('');
     }
   };
 
@@ -49,14 +63,26 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setStatusMessage('Signing in...');
+
+    const wakingTimer = setTimeout(() => {
+      setStatusMessage('Render server is spinning up (this can take 1-2 minutes on the free tier)...');
+    }, 3000);
+
     try {
       const data = await authApi.login(email, password);
+      clearTimeout(wakingTimer);
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('user_name', data.name);
       navigate('/dashboard');
     } catch (error) {
+      clearTimeout(wakingTimer);
       console.error('Error logging in:', error);
       alert(error.message || 'Network error. Please try again later.');
+    } finally {
+      setIsLoading(false);
+      setStatusMessage('');
     }
   };
 
@@ -116,11 +142,27 @@ const LoginPage = () => {
               </div>
             </div>
 
+            {isLoading && (
+              <div className="text-center text-xs text-primary/80 animate-pulse bg-primary/5 py-2 px-3 rounded-lg border border-primary/10">
+                {statusMessage}
+              </div>
+            )}
+
             <button
               type="submit"
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-primary to-secondary text-white font-semibold hover:shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all flex items-center justify-center gap-2 group"
+              disabled={isLoading}
+              className={`w-full py-3.5 rounded-xl bg-gradient-to-r from-primary to-secondary text-white font-semibold hover:shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all flex items-center justify-center gap-2 group ${isLoading ? 'opacity-75 cursor-not-allowed' : ''}`}
             >
-              Sign In <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              {isLoading ? (
+                <>
+                  <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  Please Wait...
+                </>
+              ) : (
+                <>
+                  Sign In <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </button>
           </form>
 
