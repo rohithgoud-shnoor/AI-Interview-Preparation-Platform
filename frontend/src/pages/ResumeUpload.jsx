@@ -23,6 +23,7 @@ const ResumeUpload = () => {
   const [file, setFile] = useState(null);
   const [filename, setFilename] = useState('');
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewError, setPreviewError] = useState('');
   const [status, setStatus] = useState('loading'); // loading, idle, uploading, actions, interview, feedback
   
   // Q&A and Feedback state
@@ -72,6 +73,7 @@ const ResumeUpload = () => {
 
   const loadPreviewBlob = async () => {
     try {
+      setPreviewError('');
       const blob = await resumeApi.getPreviewBlob(token);
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
@@ -80,6 +82,7 @@ const ResumeUpload = () => {
       setPreviewUrl(url);
     } catch (err) {
       console.error('Error loading preview blob:', err);
+      setPreviewError(err.message || 'Failed to load preview.');
     }
   };
 
@@ -378,9 +381,15 @@ const ResumeUpload = () => {
                     title="Resume Preview"
                   />
                 ) : (
-                  <div className="w-full flex-1 rounded-xl bg-slate-900 border border-white/5 flex flex-col items-center justify-center text-slate-500">
+                  <div className="w-full flex-1 rounded-xl bg-slate-900 border border-white/5 flex flex-col items-center justify-center text-slate-500 p-4">
                     <AlertCircle className="w-10 h-10 mb-2" />
-                    <p className="text-sm">Preview not available for this file type.</p>
+                    <p className="text-sm text-center">
+                      {previewError 
+                        ? previewError 
+                        : (filename && (filename.toLowerCase().endsWith('.pdf') || filename.toLowerCase().endsWith('.txt')))
+                        ? "Loading preview..." 
+                        : "Preview not available for this file type."}
+                    </p>
                   </div>
                 )}
               </div>

@@ -15,8 +15,15 @@ from routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/resume", tags=["resume"])
 
-UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
+# Define UPLOAD_DIR relative to backend package root, not current working directory
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+UPLOAD_DIR = os.path.join(BACKEND_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+def get_safe_basename(path: str) -> str:
+    # Replace backslashes with forward slashes to handle Windows paths on Linux
+    normalized_path = path.replace("\\", "/")
+    return os.path.basename(normalized_path)
 
 # Helper function to extract text from PDF
 def extract_text_from_pdf(file_path: str) -> str:
@@ -110,10 +117,13 @@ def upload_resume(
     # Save to Database
     db_resume = db.query(models.Resume).filter(models.Resume.user_id == current_user.id).first()
     if db_resume:
-        # Delete old file if path changed
-        if db_resume.filepath != file_path and os.path.exists(db_resume.filepath):
+        # Resolve the old path safely
+        old_filename = get_safe_basename(db_resume.filepath)
+        old_filepath = os.path.join(UPLOAD_DIR, old_filename)
+        # Delete old file if path changed and it exists
+        if old_filepath != file_path and os.path.exists(old_filepath):
             try:
-                os.remove(db_resume.filepath)
+                os.remove(old_filepath)
             except Exception:
                 pass
         db_resume.filename = file.filename
@@ -165,10 +175,20 @@ def preview_resume(
     current_user: models.User = Depends(get_current_user)
 ):
     db_resume = db.query(models.Resume).filter(models.Resume.user_id == current_user.id).first()
-    if not db_resume or not os.path.exists(db_resume.filepath):
+    if not db_resume:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No resume found. Please upload your resume first."
+        )
+
+    # Resolve path relative to current UPLOAD_DIR
+    filename_on_disk = get_safe_basename(db_resume.filepath)
+    resolved_path = os.path.join(UPLOAD_DIR, filename_on_disk)
+
+    if not os.path.exists(resolved_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume file not found on the server. Please re-upload your resume."
         )
 
     # Detect Content-Type
@@ -179,7 +199,7 @@ def preview_resume(
         media_type = "text/plain"
 
     return FileResponse(
-        db_resume.filepath,
+        resolved_path,
         media_type=media_type,
         filename=db_resume.filename
     )
@@ -205,7 +225,8 @@ def generate_questions(
 
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        gemini_model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+        model = genai.GenerativeModel(gemini_model)
         
         prompt = f"""
         You are an expert technical interviewer. 
@@ -266,7 +287,8 @@ def get_feedback(
 
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        gemini_model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+        model = genai.GenerativeModel(gemini_model)
         
         prompt = f"""
         You are an expert technical interviewer evaluating a candidate's responses to 10 resume-tailored questions.
