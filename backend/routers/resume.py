@@ -1,6 +1,7 @@
 import os
 import shutil
 import json
+import time
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Response
 from fastapi.responses import FileResponse
@@ -8,10 +9,62 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from pypdf import PdfReader
 import docx
-import google.generativeai as genai
+import requests
 
 import models, database
 from routers.auth import get_current_user
+
+def _call_groq_with_retry(prompt: str, model: str, api_key: str, max_retries=3) -> str:
+    """Call Groq API with automatic retry and exponential backoff for rate limits."""
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "response_format": {"type": "json_object"}
+    }
+    
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            if response.status_code == 200:
+                res_json = response.json()
+                return res_json["choices"][0]["message"]["content"]
+            elif response.status_code == 429:
+                # Exponential backoff: 5s, 10s, 20s
+                wait_time = 5 * (2 ** attempt)
+                time.sleep(wait_time)
+                last_error = HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="The Groq AI is currently busy. Rate limit reached after multiple retries. Please wait about 30 seconds and try again."
+                )
+            else:
+                raise Exception(f"Groq API error (status {response.status_code}): {response.text}")
+        except Exception as e:
+            last_error = e
+            # If it's a request exception (connection error, etc.), retry
+            # If it's a non-rate-limit HTTP error, don't retry and just raise
+            if not isinstance(e, requests.RequestException) and "429" not in str(e):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Groq API failure: {str(e)}"
+                )
+    
+    if isinstance(last_error, HTTPException):
+        raise last_error
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"Groq API call failed after multiple attempts: {str(last_error)}"
+    )
 
 router = APIRouter(prefix="/api/resume", tags=["resume"])
 
@@ -239,17 +292,15 @@ def generate_questions(
             detail="No resume found. Please upload your resume first."
         )
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Gemini API Key is not configured on the server."
+            detail="Groq API Key is not configured on the server."
         )
 
     try:
-        genai.configure(api_key=api_key)
-        gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-        model = genai.GenerativeModel(gemini_model)
+        groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
         
         prompt = f"""
         You are an expert technical interviewer. 
@@ -266,28 +317,19 @@ def generate_questions(
         Do not output any introductory or concluding text, only valid JSON.
         """
 
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
-        )
+        response_text = _call_groq_with_retry(prompt, groq_model, api_key)
         
-        data = json.loads(response.text)
+        data = json.loads(response_text)
         if "questions" not in data or len(data["questions"]) != 10:
-            # Fallback retry without JSON enforcement if parser failed
-            # But the gemini model usually respects the JSON response_mime_type perfectly
             raise ValueError("Invalid number of questions generated.")
             
         return data
+    except HTTPException:
+        raise
     except Exception as e:
-        err_msg = str(e)
-        if "429" in err_msg or "Quota exceeded" in err_msg or "ResourceExhausted" in err_msg:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="The AI is currently busy. You have exceeded your free tier rate limit. Please wait about 30 seconds and try again."
-            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate questions: {err_msg}"
+            detail=f"Failed to generate questions: {str(e)}"
         )
 
 @router.post("/feedback")
@@ -301,11 +343,11 @@ def get_feedback(
             detail="Number of questions and answers must match."
         )
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Gemini API Key is not configured on the server."
+            detail="Groq API Key is not configured on the server."
         )
 
     # Format the QA block
@@ -315,9 +357,7 @@ def get_feedback(
     qa_formatted = "\n".join(qa_list)
 
     try:
-        genai.configure(api_key=api_key)
-        gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-        model = genai.GenerativeModel(gemini_model)
+        groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
         
         prompt = f"""
         You are an expert technical interviewer evaluating a candidate's responses to 10 resume-tailored questions.
@@ -355,21 +395,14 @@ def get_feedback(
         Do not output any introductory or concluding text, only valid JSON.
         """
 
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
-        )
+        response_text = _call_groq_with_retry(prompt, groq_model, api_key)
         
-        data = json.loads(response.text)
+        data = json.loads(response_text)
         return data
+    except HTTPException:
+        raise
     except Exception as e:
-        err_msg = str(e)
-        if "429" in err_msg or "Quota exceeded" in err_msg or "ResourceExhausted" in err_msg:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="The AI is currently busy. You have exceeded your free tier rate limit. Please wait about 30 seconds and try again."
-            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate feedback: {err_msg}"
+            detail=f"Failed to generate feedback: {str(e)}"
         )
