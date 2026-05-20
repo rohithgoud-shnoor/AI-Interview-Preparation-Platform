@@ -331,7 +331,12 @@ const ResumeUpload = () => {
                 <div className="flex flex-col gap-3">
                   <button
                     onClick={handleDownload}
-                    className="w-full py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium border border-white/10 transition-colors flex items-center justify-center gap-2"
+                    disabled={!previewUrl}
+                    className={`w-full py-3 px-4 rounded-xl font-medium border transition-colors flex items-center justify-center gap-2 ${
+                      previewUrl 
+                        ? 'bg-white/5 hover:bg-white/10 text-white border-white/10' 
+                        : 'bg-white/5 text-slate-500 border-white/5 cursor-not-allowed'
+                    }`}
                   >
                     <Download className="w-4.5 h-4.5" /> Download Resume
                   </button>

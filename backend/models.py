@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text, LargeBinary
 from database import Base
 
 class User(Base):
@@ -18,4 +18,5 @@ class Resume(Base):
     filename = Column(String)
     filepath = Column(String)
     extracted_text = Column(Text, nullable=True)
+    file_content = Column(LargeBinary, nullable=True)
 

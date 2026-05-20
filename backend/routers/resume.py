@@ -2,7 +2,7 @@ import os
 import shutil
 import json
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -89,10 +89,21 @@ def upload_resume(
     filename = f"user_{current_user.id}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, filename)
 
+    # Read file content bytes for database storage
+    try:
+        file.file.seek(0)
+        file_content_bytes = file.file.read()
+        file.file.seek(0)  # Reset pointer for subsequent read if needed
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read file contents: {str(e)}"
+        )
+
     # Save file locally
     try:
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            buffer.write(file_content_bytes)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -129,12 +140,14 @@ def upload_resume(
         db_resume.filename = file.filename
         db_resume.filepath = file_path
         db_resume.extracted_text = extracted_text
+        db_resume.file_content = file_content_bytes
     else:
         db_resume = models.Resume(
             user_id=current_user.id,
             filename=file.filename,
             filepath=file_path,
-            extracted_text=extracted_text
+            extracted_text=extracted_text,
+            file_content=file_content_bytes
         )
         db.add(db_resume)
 
@@ -185,12 +198,6 @@ def preview_resume(
     filename_on_disk = get_safe_basename(db_resume.filepath)
     resolved_path = os.path.join(UPLOAD_DIR, filename_on_disk)
 
-    if not os.path.exists(resolved_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Resume file not found on the server. Please re-upload your resume."
-        )
-
     # Detect Content-Type
     media_type = "application/octet-stream"
     if db_resume.filename.lower().endswith(".pdf"):
@@ -198,11 +205,27 @@ def preview_resume(
     elif db_resume.filename.lower().endswith(".txt"):
         media_type = "text/plain"
 
-    return FileResponse(
-        resolved_path,
-        media_type=media_type,
-        filename=db_resume.filename
-    )
+    # Try serving from local disk first
+    if os.path.exists(resolved_path):
+        return FileResponse(
+            resolved_path,
+            media_type=media_type,
+            filename=db_resume.filename
+        )
+    # Fallback to serving bytes from database
+    elif db_resume.file_content is not None:
+        return Response(
+            content=db_resume.file_content,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f"inline; filename={db_resume.filename}"
+            }
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume file not found on the server. Please re-upload your resume."
+        )
 
 @router.post("/generate-questions")
 def generate_questions(
