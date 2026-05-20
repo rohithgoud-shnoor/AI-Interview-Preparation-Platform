@@ -17,7 +17,7 @@ const request = async (endpoint, options = {}, retries = 5, delay = 3000) => {
   const url = `${API_URL}${cleanEndpoint}`;
 
   const headers = {
-    'Content-Type': 'application/json',
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...options.headers,
   };
 
@@ -43,6 +43,10 @@ const request = async (endpoint, options = {}, retries = 5, delay = 3000) => {
           errorDetail = response.statusText || errorDetail;
         }
         throw new Error(errorDetail);
+      }
+
+      if (options.responseType === 'blob') {
+        return await response.blob();
       }
 
       return await response.json();
@@ -110,6 +114,74 @@ export const authApi = {
   getMe: (token) => {
     return request('/api/auth/me', {
       method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
+};
+
+/**
+ * Resume & AI Interview API Endpoints
+ */
+export const resumeApi = {
+  /**
+   * Get resume upload status (whether user has uploaded a resume)
+   */
+  getStatus: (token) => {
+    return request('/api/resume/status', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
+
+  /**
+   * Upload resume file (PDF, DOCX, TXT)
+   */
+  upload: (formData, token) => {
+    return request('/api/resume/upload', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
+
+  /**
+   * Get PDF preview blob
+   */
+  getPreviewBlob: (token) => {
+    return request('/api/resume/preview', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      responseType: 'blob',
+    });
+  },
+
+  /**
+   * Generate 10 interview questions based on the candidate's resume
+   */
+  generateQuestions: (token) => {
+    return request('/api/resume/generate-questions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
+
+  /**
+   * Submit answers and receive AI feedback
+   */
+  submitFeedback: (questions, answers, token) => {
+    return request('/api/resume/feedback', {
+      method: 'POST',
+      body: JSON.stringify({ questions, answers }),
       headers: {
         'Authorization': `Bearer ${token}`,
       },

@@ -9,3 +9,8 @@ bcrypt
 email-validator
 google-auth
 requests
+pypdf
+python-multipart
+google-generativeai
+python-docx
+

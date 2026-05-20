@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
-from routers import auth
+from routers import auth, resume
 
 # Create the database tables
 Base.metadata.create_all(bind=engine)
@@ -16,7 +16,9 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(resume.router)
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the AI Interview Platform API"}
+    return {"message": "Welcome to the AI Interview Preparation Platform API"}
+

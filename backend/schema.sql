@@ -20,3 +20,15 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS ix_users_id ON users (id);
 CREATE INDEX IF NOT EXISTS ix_users_name ON users (name);
 CREATE INDEX IF NOT EXISTS ix_users_email ON users (email);
+
+-- 4. Create Resumes Table
+CREATE TABLE IF NOT EXISTS resumes (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    filename VARCHAR(255) NOT NULL,
+    filepath VARCHAR(255) NOT NULL,
+    extracted_text TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_resumes_user_id ON resumes (user_id);
+
