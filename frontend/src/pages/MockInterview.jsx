@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Mic, Video, VideoOff, MicOff, Send, PhoneOff, Settings, User } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Mic, Video, VideoOff, MicOff, Send, PhoneOff, Settings, User, Play, Square, Circle } from 'lucide-react';
+import { recordingsApi } from '../services/api';
 
 const ChatMessage = ({ message }) => (
   <div className={`flex gap-4 ${message.isAi ? 'flex-row' : 'flex-row-reverse'} mb-6`}>
@@ -13,9 +14,20 @@ const ChatMessage = ({ message }) => (
 );
 
 const MockInterview = () => {
+  const [isInterviewStarted, setIsInterviewStarted] = useState(false);
+  const [interviewQuestion, setInterviewQuestion] = useState('');
+  
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [input, setInput] = useState('');
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const [stream, setStream] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const videoRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
 
   const messages = [
     { text: "Hello! I'm your AI interviewer. Let's start with your background. Can you walk me through your experience with React?", isAi: true },
@@ -23,89 +35,179 @@ const MockInterview = () => {
     { text: "That sounds like a great initiative. What were some of the challenges you faced during that migration, and how did you overcome them?", isAi: true },
   ];
 
-  return (
-    <div className="h-[calc(100vh-6rem)] flex flex-col lg:flex-row gap-6">
-      {/* Video Section */}
-      <div className="lg:w-1/2 flex flex-col gap-4 h-full">
-        <div className="glass-card flex-1 relative overflow-hidden group">
-          {/* AI Avatar Placeholder */}
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-800 to-slate-900 flex items-center justify-center">
-            <div className="w-48 h-48 rounded-full bg-primary/20 flex items-center justify-center relative">
-              <div className="absolute inset-0 rounded-full border-4 border-primary/30 animate-ping opacity-50" />
-              <div className="w-40 h-40 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-[0_0_50px_rgba(147,51,234,0.5)]">
-                <span className="text-4xl font-bold text-white">AI</span>
-              </div>
-            </div>
-          </div>
-          <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-md bg-black/50 backdrop-blur-md text-white text-sm font-medium">
-            Interviewer (AI)
-          </div>
-        </div>
+  const handleStartInterview = async () => {
+    if (!interviewQuestion.trim()) {
+      alert("Please enter a question first.");
+      return;
+    }
+    try {
+      const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setStream(userStream);
+      setIsInterviewStarted(true);
+      setErrorMsg('');
+    } catch (err) {
+      setErrorMsg("Please allow camera and microphone access to start the interview.");
+      alert("Camera or Microphone access blocked. Please remove the block to continue.");
+    }
+  };
 
-        <div className="h-64 glass-card relative overflow-hidden bg-slate-900">
-          {/* User Video Placeholder */}
-          {!isVideoOn ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center">
-                <User className="w-10 h-10 text-slate-500" />
-              </div>
-            </div>
-          ) : (
-            <div className="absolute inset-0 bg-slate-800" />
-          )}
-          <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-md bg-black/50 backdrop-blur-md text-white text-sm font-medium">
-            You
-          </div>
-          
-          {/* Controls */}
-          <div className="absolute bottom-4 right-4 flex items-center gap-2">
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream, isVideoOn]);
+
+  const toggleVideo = () => {
+    if (stream) {
+      stream.getVideoTracks().forEach(track => track.enabled = !isVideoOn);
+      setIsVideoOn(!isVideoOn);
+    }
+  };
+
+  const toggleMic = () => {
+    if (stream) {
+      stream.getAudioTracks().forEach(track => track.enabled = !isMicOn);
+      setIsMicOn(!isMicOn);
+    }
+  };
+
+  const handleStartRecording = () => {
+    if (!stream) return;
+    chunksRef.current = [];
+    const recorder = new MediaRecorder(stream);
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        chunksRef.current.push(e.data);
+      }
+    };
+    recorder.onstop = async () => {
+      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          alert("You must be logged in to save recordings.");
+          return;
+        }
+        await recordingsApi.uploadRecording(blob, interviewQuestion, token);
+        alert("Recording uploaded successfully! Check 'My Recordings'.");
+      } catch (err) {
+        console.error("Failed to upload recording:", err);
+        alert("Failed to upload recording to cloud.");
+      }
+    };
+    recorder.start();
+    mediaRecorderRef.current = recorder;
+    setIsRecording(true);
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const handleEndCall = () => {
+    if (isRecording) {
+      handleStopRecording();
+    }
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+    setIsInterviewStarted(false);
+    setStream(null);
+  };
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream]);
+
+  if (!isInterviewStarted) {
+    return (
+      <div className="h-[calc(100vh-6rem)] flex items-center justify-center">
+        <div className="glass-card p-8 max-w-lg w-full">
+          <h2 className="text-2xl font-bold text-white mb-6 text-center">Start Mock Interview</h2>
+          <div className="flex flex-col gap-4">
+            <label className="text-sm text-slate-300 font-medium">Enter a topic or question to practice:</label>
+            <textarea 
+              value={interviewQuestion}
+              onChange={(e) => setInterviewQuestion(e.target.value)}
+              className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary/50 min-h-[120px]"
+              placeholder="e.g., Explain the concept of closure in JavaScript."
+            />
+            {errorMsg && <p className="text-red-400 text-sm">{errorMsg}</p>}
             <button 
-              onClick={() => setIsMicOn(!isMicOn)}
-              className={`p-3 rounded-full backdrop-blur-md transition-colors ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500/80 hover:bg-red-500 text-white'}`}
+              onClick={handleStartInterview}
+              className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold transition-all mt-4"
             >
-              {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-            </button>
-            <button 
-              onClick={() => setIsVideoOn(!isVideoOn)}
-              className={`p-3 rounded-full backdrop-blur-md transition-colors ${isVideoOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500/80 hover:bg-red-500 text-white'}`}
-            >
-              {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-            </button>
-            <button className="p-3 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors ml-2">
-              <PhoneOff className="w-5 h-5" />
+              Start Interview
             </button>
           </div>
         </div>
       </div>
+    );
+  }
 
-      {/* Chat Section */}
-      <div className="lg:w-1/2 glass-card flex flex-col h-full overflow-hidden">
-        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
-          <h3 className="text-lg font-semibold text-white">Live Transcript</h3>
-          <button className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
-            <Settings className="w-5 h-5" />
-          </button>
+  return (
+    <div className="h-[calc(100vh-6rem)] flex items-center justify-center p-6">
+      <div className="w-full max-w-5xl h-full glass-card relative overflow-hidden bg-slate-900 rounded-3xl shadow-2xl">
+        {/* User Video Placeholder */}
+        {!isVideoOn ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-32 h-32 rounded-full bg-slate-800 flex items-center justify-center shadow-lg">
+              <User className="w-16 h-16 text-slate-500" />
+            </div>
+          </div>
+        ) : (
+          <video 
+            ref={videoRef} 
+            autoPlay 
+            playsInline 
+            muted 
+            className="absolute inset-0 w-full h-full object-cover mirror"
+          />
+        )}
+        <div className="absolute bottom-6 left-6 px-4 py-2 rounded-lg bg-black/60 backdrop-blur-md text-white font-medium shadow-lg flex items-center gap-2">
+          You {isRecording && <span className="text-red-500 animate-pulse font-bold flex items-center gap-1"><Circle className="w-3 h-3" fill="currentColor" /> REC</span>}
         </div>
         
-        <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
-          {messages.map((msg, i) => (
-            <ChatMessage key={i} message={msg} />
-          ))}
-        </div>
-
-        <div className="p-4 border-t border-white/10 bg-white/5">
-          <div className="flex items-center gap-2">
-            <input 
-              type="text" 
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your response..."
-              className="flex-1 bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
-            />
-            <button className="p-3 rounded-xl bg-primary hover:bg-primary/90 text-white transition-colors">
-              <Send className="w-5 h-5" />
+        {/* Controls */}
+        <div className="absolute bottom-6 right-6 flex items-center gap-4">
+          {!isRecording ? (
+            <button 
+              onClick={handleStartRecording}
+              title="Start Recording"
+              className="p-4 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white backdrop-blur-md transition-all shadow-xl hover:scale-105"
+            >
+              <Circle className="w-6 h-6 text-red-500" fill="currentColor" />
             </button>
-          </div>
+          ) : (
+            <button 
+              onClick={handleStopRecording}
+              title="Stop Recording"
+              className="p-4 rounded-full bg-red-500/80 hover:bg-red-600 text-white backdrop-blur-md transition-all shadow-xl hover:scale-105"
+            >
+              <Square className="w-6 h-6" fill="currentColor" />
+            </button>
+          )}
+          
+          <button 
+            onClick={toggleMic}
+            className={`p-4 rounded-full backdrop-blur-md transition-all shadow-xl hover:scale-105 ${isMicOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500/80 hover:bg-red-500 text-white'}`}
+          >
+            {isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+          </button>
+          <button 
+            onClick={toggleVideo}
+            className={`p-4 rounded-full backdrop-blur-md transition-all shadow-xl hover:scale-105 ${isVideoOn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-500/80 hover:bg-red-500 text-white'}`}
+          >
+            {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+          </button>
         </div>
       </div>
     </div>

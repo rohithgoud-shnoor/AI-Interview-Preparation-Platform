@@ -29,3 +29,17 @@ class TokenData(BaseModel):
 
 class GoogleLoginRequest(BaseModel):
     token: str
+
+class RecordingCreate(BaseModel):
+    question: str
+    video_url: str
+
+class Recording(BaseModel):
+    id: int
+    user_id: int
+    question: str
+    video_url: str
+    created_at: str
+
+    class Config:
+        from_attributes = True

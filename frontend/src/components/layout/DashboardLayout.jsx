@@ -10,7 +10,8 @@ import {
   User,
   Settings,
   LogOut,
-  Sparkles
+  Sparkles,
+  Video
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -29,6 +30,7 @@ const Sidebar = () => {
     { name: 'Weak Topics', path: '/dashboard/weak-topics', icon: Target },
     { name: 'Reports', path: '/dashboard/analytics', icon: BarChart3 },
     { name: 'Profile', path: '/dashboard/profile', icon: User },
+    { name: 'My Recordings', path: '/dashboard/recordings', icon: Video },
     { name: 'Settings', path: '/dashboard/settings', icon: Settings },
   ];
 

@@ -5,6 +5,7 @@ import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import ResumeUpload from './pages/ResumeUpload';
 import MockInterview from './pages/MockInterview';
+import MyRecordings from './pages/MyRecordings';
 import Analytics from './pages/Analytics';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -22,6 +23,7 @@ function App() {
           <Route path="resume" element={<ResumeUpload />} />
           <Route path="interview" element={<MockInterview />} />
           <Route path="analytics" element={<Analytics />} />
+          <Route path="recordings" element={<MyRecordings />} />
         </Route>
       </Routes>
     </BrowserRouter>

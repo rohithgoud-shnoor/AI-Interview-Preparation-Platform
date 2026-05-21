@@ -12,4 +12,5 @@ requests
 pypdf
 python-multipart
 python-docx
-
+cloudinary
+python-multipart

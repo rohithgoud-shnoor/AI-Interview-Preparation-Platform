@@ -20,3 +20,11 @@ class Resume(Base):
     extracted_text = Column(Text, nullable=True)
     file_content = Column(LargeBinary, nullable=True)
 
+class Recording(Base):
+    __tablename__ = "recordings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    question = Column(String)
+    video_url = Column(String)
+    created_at = Column(String)

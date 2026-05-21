@@ -188,3 +188,37 @@ export const resumeApi = {
     });
   },
 };
+
+/**
+ * Recordings API Endpoints
+ */
+export const recordingsApi = {
+  /**
+   * Upload a recording to the backend (Cloudinary)
+   */
+  uploadRecording: (blob, question, token) => {
+    const formData = new FormData();
+    formData.append('file', blob, 'recording.webm');
+    formData.append('question', question);
+
+    return request('/api/recordings/upload', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
+
+  /**
+   * Get all recordings for the current user
+   */
+  getMyRecordings: (token) => {
+    return request('/api/recordings/me', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
+};
