@@ -32,3 +32,15 @@ CREATE TABLE IF NOT EXISTS resumes (
 
 CREATE INDEX IF NOT EXISTS ix_resumes_user_id ON resumes (user_id);
 
+-- 5. Create Recordings Table
+CREATE TABLE IF NOT EXISTS recordings (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    question VARCHAR(255) NOT NULL,
+    video_url VARCHAR(255) NOT NULL,
+    created_at VARCHAR(255) NOT NULL,
+    transcript TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_recordings_user_id ON recordings (user_id);
+

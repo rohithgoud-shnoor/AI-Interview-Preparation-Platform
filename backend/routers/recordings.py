@@ -4,9 +4,88 @@ from datetime import datetime
 import cloudinary
 import cloudinary.uploader
 from typing import List
+import os
+import shutil
+import tempfile
+import requests
+import math
+import json
 
 import models, schemas, database
 from routers.auth import get_current_user
+
+def transcribe_audio_file(file_path: str) -> str:
+    """
+    Sends the audio/video file to Groq Whisper API for transcription,
+    and returns a JSON string containing the formatted 30-second chunks.
+    """
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise Exception("GROQ_API_KEY is not configured.")
+        
+    url = "https://api.groq.com/openai/v1/audio/transcriptions"
+    headers = {
+        "Authorization": f"Bearer {api_key}"
+    }
+    
+    try:
+        with open(file_path, "rb") as f:
+            files = {
+                "file": (os.path.basename(file_path), f, "audio/webm")
+            }
+            data = {
+                "model": "whisper-large-v3",
+                "response_format": "verbose_json"
+            }
+            response = requests.post(url, headers=headers, files=files, data=data, timeout=60)
+            
+        if response.status_code != 200:
+            raise Exception(f"Groq Whisper API returned status {response.status_code}: {response.text}")
+            
+        res_json = response.json()
+        
+        # Process segments into 30-second cards
+        duration = res_json.get("duration", 0)
+        segments = res_json.get("segments", [])
+        
+        if duration == 0 and segments:
+            duration = segments[-1].get("end", 0)
+            
+        num_chunks = max(1, math.ceil(duration / 30.0))
+        chunks = []
+        
+        for i in range(num_chunks):
+            start_time = i * 30
+            end_time = (i + 1) * 30
+            
+            start_str = f"{start_time // 60:02d}:{start_time % 60:02d}"
+            end_str = f"{end_time // 60:02d}:{end_time % 60:02d}"
+            
+            chunks.append({
+                "timestamp": f"{start_str} - {end_str}",
+                "text": ""
+            })
+            
+        for segment in segments:
+            start = segment.get("start", 0)
+            chunk_idx = min(int(start // 30), num_chunks - 1)
+            text = segment.get("text", "").strip()
+            if text:
+                if chunks[chunk_idx]["text"]:
+                    chunks[chunk_idx]["text"] += " " + text
+                else:
+                    chunks[chunk_idx]["text"] = text
+                    
+        # Fill in silence placeholders if any chunk text is empty
+        for chunk in chunks:
+            if not chunk["text"]:
+                chunk["text"] = "(No speech detected)"
+                
+        return json.dumps(chunks)
+    except Exception as e:
+        print(f"Transcription error in transcribe_audio_file: {e}")
+        raise e
+
 
 router = APIRouter(prefix="/api/recordings", tags=["recordings"])
 
@@ -31,6 +110,34 @@ def upload_recording(
     try:
         # Ensure file pointer is at start
         file.file.seek(0)
+        
+        # Attempt transcription first by copying stream to a temp file
+        transcript_json = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_file:
+                shutil.copyfileobj(file.file, temp_file)
+                temp_path = temp_file.name
+            
+            # Reset file pointer for Cloudinary upload
+            file.file.seek(0)
+            
+            # Transcribe audio via Groq Whisper API
+            transcript_json = transcribe_audio_file(temp_path)
+            
+            # Clean up temp file
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+        except Exception as te:
+            print(f"Transcription during upload failed: {te}")
+            # Ensure cleanup on failure
+            if 'temp_path' in locals() and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+        
         # Upload to cloudinary as video
         result = cloudinary.uploader.upload(
             file.file,
@@ -42,12 +149,14 @@ def upload_recording(
         video_url = result.get("secure_url")
         if not video_url:
             raise Exception("Cloudinary did not return a secure_url")
+            
         # Save to database
         db_recording = models.Recording(
             user_id=current_user.id,
             question=question,
             video_url=video_url,
-            created_at=datetime.utcnow().isoformat()
+            created_at=datetime.utcnow().isoformat(),
+            transcript=transcript_json
         )
         db.add(db_recording)
         db.commit()
@@ -65,3 +174,61 @@ def get_my_recordings(
 ):
     recordings = db.query(models.Recording).filter(models.Recording.user_id == current_user.id).order_by(models.Recording.id.desc()).all()
     return recordings
+
+@router.get("/{recording_id}/transcript")
+def get_recording_transcript(
+    recording_id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    recording = db.query(models.Recording).filter(
+        models.Recording.id == recording_id,
+        models.Recording.user_id == current_user.id
+    ).first()
+    
+    if not recording:
+        raise HTTPException(status_code=404, detail="Recording not found")
+        
+    if recording.transcript:
+        return json.loads(recording.transcript)
+        
+    # On-demand transcription fallback if transcript is missing
+    try:
+        # Download from Cloudinary
+        video_response = requests.get(recording.video_url, stream=True)
+        if video_response.status_code != 200:
+            raise Exception(f"Failed to download video from Cloudinary: status {video_response.status_code}")
+            
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_file:
+            for chunk in video_response.iter_content(chunk_size=8192):
+                if chunk:
+                    temp_file.write(chunk)
+            temp_path = temp_file.name
+            
+        transcript_json = transcribe_audio_file(temp_path)
+        
+        # Clean up temp file
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
+            
+        # Update database
+        recording.transcript = transcript_json
+        db.commit()
+        db.refresh(recording)
+        
+        return json.loads(transcript_json)
+    except Exception as e:
+        print(f"On-demand transcription failed for recording {recording_id}: {e}")
+        # Clean up temp file in case of error
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to transcribe recording: {str(e)}"
+        )
+

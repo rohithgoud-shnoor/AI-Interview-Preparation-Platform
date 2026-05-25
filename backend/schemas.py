@@ -40,6 +40,7 @@ class Recording(BaseModel):
     question: str
     video_url: str
     created_at: str
+    transcript: Optional[str] = None
 
     class Config:
         from_attributes = True

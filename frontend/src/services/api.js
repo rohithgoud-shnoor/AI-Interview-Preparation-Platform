@@ -221,4 +221,16 @@ export const recordingsApi = {
       },
     });
   },
+
+  /**
+   * Get transcript chunks for a specific recording
+   */
+  getTranscript: (recordingId, token) => {
+    return request(`/api/recordings/${recordingId}/transcript`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
 };

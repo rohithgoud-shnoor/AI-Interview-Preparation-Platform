@@ -28,3 +28,5 @@ class Recording(Base):
     question = Column(String)
     video_url = Column(String)
     created_at = Column(String)
+    transcript = Column(Text, nullable=True)
+
