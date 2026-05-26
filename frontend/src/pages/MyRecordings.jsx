@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { recordingsApi } from '../services/api';
-import { Video, Calendar, X, MessageSquare, AlertCircle, Loader2 } from 'lucide-react';
+import { Video, Calendar, X, MessageSquare, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 
 const MyRecordings = () => {
   const [recordings, setRecordings] = useState([]);
@@ -11,6 +11,13 @@ const MyRecordings = () => {
   const [transcriptChunks, setTranscriptChunks] = useState([]);
   const [loadingTranscript, setLoadingTranscript] = useState(false);
   const [transcriptError, setTranscriptError] = useState('');
+
+  // AI Analysis states
+  const [analysisChunks, setAnalysisChunks] = useState([]);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [analysisError, setAnalysisError] = useState('');
+  const [showAnalysis, setShowAnalysis] = useState(false);
+
 
   const fetchRecordings = async () => {
     try {
@@ -39,6 +46,9 @@ const MyRecordings = () => {
     setLoadingTranscript(true);
     setTranscriptChunks([]);
     setTranscriptError('');
+    setAnalysisChunks([]);
+    setAnalysisError('');
+    setShowAnalysis(false);
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -47,6 +57,17 @@ const MyRecordings = () => {
       }
       const chunks = await recordingsApi.getTranscript(rec.id, token);
       setTranscriptChunks(chunks);
+      // Pre-load analysis if it was already generated and saved in the recording object
+      if (rec.ai_analysis) {
+        try {
+          const parsed = JSON.parse(rec.ai_analysis);
+          if (parsed && parsed.analysis) {
+            setAnalysisChunks(parsed.analysis);
+          }
+        } catch (e) {
+          console.error("Failed to parse cached analysis:", e);
+        }
+      }
     } catch (err) {
       console.error("Failed to load transcript:", err);
       setTranscriptError(err.message || "Failed to load or generate transcript.");
@@ -54,6 +75,31 @@ const MyRecordings = () => {
       setLoadingTranscript(false);
     }
   };
+
+  const handleRunAnalysis = async () => {
+    if (analysisChunks.length > 0) {
+      setShowAnalysis(true);
+      return;
+    }
+    setLoadingAnalysis(true);
+    setAnalysisError('');
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setAnalysisError("You must be logged in to run analysis.");
+        return;
+      }
+      const data = await recordingsApi.analyzeTranscript(selectedRecording.id, token);
+      setAnalysisChunks(data.analysis || []);
+      setShowAnalysis(true);
+    } catch (err) {
+      console.error("Failed to analyze transcript:", err);
+      setAnalysisError(err.message || "Failed to generate AI analysis.");
+    } finally {
+      setLoadingAnalysis(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -120,14 +166,20 @@ const MyRecordings = () => {
       {/* Transcript Modal Overlay */}
       {selectedRecording && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="glass-card w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl border border-white/10 bg-slate-900/95 animate-in fade-in zoom-in-95 duration-200">
+          <div className={`glass-card w-full ${showAnalysis ? 'max-w-5xl' : 'max-w-2xl'} max-h-[85vh] flex flex-col overflow-hidden shadow-2xl border border-white/10 bg-slate-900/95 transition-all duration-300 animate-in fade-in zoom-in-95 duration-200`}>
             {/* Modal Header */}
             <div className="p-5 border-b border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
-                  <MessageSquare className="w-4.5 h-4.5" />
+                  {showAnalysis ? (
+                    <Sparkles className="w-4.5 h-4.5" />
+                  ) : (
+                    <MessageSquare className="w-4.5 h-4.5" />
+                  )}
                 </div>
-                <h2 className="text-lg font-bold text-white">Interview Transcript</h2>
+                <h2 className="text-lg font-bold text-white">
+                  {showAnalysis ? 'AI Transcript Analysis' : 'Interview Transcript'}
+                </h2>
               </div>
               <button 
                 onClick={() => setSelectedRecording(null)}
@@ -145,6 +197,33 @@ const MyRecordings = () => {
                 <p className="text-white font-medium">{selectedRecording.question}</p>
               </div>
 
+              {/* Mode Toggle Tabs (only if transcript is loaded and not loading) */}
+              {!loadingTranscript && !transcriptError && (analysisChunks.length > 0 || loadingAnalysis) && (
+                <div className="flex border-b border-white/5 pb-2 gap-4">
+                  <button
+                    onClick={() => setShowAnalysis(false)}
+                    className={`pb-2 px-1 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
+                      !showAnalysis 
+                        ? 'border-primary text-white' 
+                        : 'border-transparent text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Original Transcript
+                  </button>
+                  <button
+                    onClick={() => setShowAnalysis(true)}
+                    className={`pb-2 px-1 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+                      showAnalysis 
+                        ? 'border-primary text-white' 
+                        : 'border-transparent text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    AI Analysis Comparison
+                  </button>
+                </div>
+              )}
+
               {/* Loading State */}
               {loadingTranscript && (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -152,6 +231,17 @@ const MyRecordings = () => {
                   <div className="text-center">
                     <p className="text-white font-medium">Transcribing recording...</p>
                     <p className="text-slate-400 text-xs mt-1">This might take a few seconds as the AI parses the video audio.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading Analysis State */}
+              {loadingAnalysis && (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  <div className="text-center">
+                    <p className="text-white font-medium">Analyzing response with AI...</p>
+                    <p className="text-slate-400 text-xs mt-1">Enhancing clarity, grammar, and professionalism chunk by chunk.</p>
                   </div>
                 </div>
               )}
@@ -173,8 +263,25 @@ const MyRecordings = () => {
                 </div>
               )}
 
-              {/* Transcript Chunks list */}
-              {!loadingTranscript && !transcriptError && (
+              {/* Analysis Error State */}
+              {analysisError && (
+                <div className="flex flex-col items-center justify-center py-8 px-4 bg-red-500/10 border border-red-500/20 rounded-xl gap-3">
+                  <AlertCircle className="w-8 h-8 text-red-400" />
+                  <div className="text-center">
+                    <p className="text-red-400 font-medium">Failed to generate AI analysis</p>
+                    <p className="text-slate-400 text-xs mt-1">{analysisError}</p>
+                  </div>
+                  <button 
+                    onClick={handleRunAnalysis}
+                    className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold text-xs transition-colors mt-2"
+                  >
+                    Retry AI Analysis
+                  </button>
+                </div>
+              )}
+
+              {/* Transcript Chunks list (Original View) */}
+              {!loadingTranscript && !transcriptError && !showAnalysis && !loadingAnalysis && (
                 <div className="space-y-4">
                   {transcriptChunks.length === 0 ? (
                     <p className="text-center py-8 text-slate-400 text-sm">No transcript chunks available.</p>
@@ -197,10 +304,60 @@ const MyRecordings = () => {
                   )}
                 </div>
               )}
+
+              {/* AI Comparison View */}
+              {!loadingTranscript && !transcriptError && showAnalysis && !loadingAnalysis && !analysisError && (
+                <div className="space-y-6">
+                  {analysisChunks.length === 0 ? (
+                    <p className="text-center py-8 text-slate-400 text-sm">No analysis chunks available.</p>
+                  ) : (
+                    analysisChunks.map((chunk, index) => (
+                      <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                        {/* Original Transcript Box */}
+                        <div className="bg-white/5 border border-white/5 p-4 rounded-xl flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold tracking-wider text-purple-400 bg-purple-500/10 border border-purple-500/20">
+                              {chunk.timestamp}
+                            </span>
+                            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Original</span>
+                          </div>
+                          <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+                            {chunk.original_text || chunk.text || (transcriptChunks[index] && transcriptChunks[index].text)}
+                          </p>
+                        </div>
+
+                        {/* AI Improved Box */}
+                        <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl flex flex-col gap-2 shadow-sm shadow-emerald-500/5">
+                          <div className="flex items-center justify-between">
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" />
+                              AI Improved
+                            </span>
+                          </div>
+                          <p className="text-emerald-100 text-sm leading-relaxed whitespace-pre-wrap font-medium">
+                            {chunk.improved_text}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-white/5 bg-slate-950/40 flex justify-end">
+            <div className="p-4 border-t border-white/5 bg-slate-950/40 flex justify-between items-center">
+              <div>
+                {!loadingTranscript && !transcriptError && !showAnalysis && !loadingAnalysis && (
+                  <button
+                    onClick={handleRunAnalysis}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-lg shadow-indigo-500/20 disabled:opacity-50 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    AI Analysis
+                  </button>
+                )}
+              </div>
               <button 
                 onClick={() => setSelectedRecording(null)}
                 className="px-4 py-2 text-sm font-semibold rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-all cursor-pointer"
@@ -208,6 +365,7 @@ const MyRecordings = () => {
                 Close
               </button>
             </div>
+
           </div>
         </div>
       )}

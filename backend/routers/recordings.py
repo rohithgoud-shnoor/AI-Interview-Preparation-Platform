@@ -232,3 +232,147 @@ def get_recording_transcript(
             detail=f"Failed to transcribe recording: {str(e)}"
         )
 
+def _call_groq_with_retry(prompt: str, model: str, api_key: str, max_retries=3) -> str:
+    """Call Groq API with automatic retry and exponential backoff for rate limits."""
+    import time
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "response_format": {"type": "json_object"}
+    }
+    
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            if response.status_code == 200:
+                res_json = response.json()
+                return res_json["choices"][0]["message"]["content"]
+            elif response.status_code == 429:
+                wait_time = 5 * (2 ** attempt)
+                time.sleep(wait_time)
+                from fastapi import status
+                last_error = HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="The Groq AI is currently busy. Rate limit reached. Please wait about 30 seconds and try again."
+                )
+            else:
+                raise Exception(f"Groq API error (status {response.status_code}): {response.text}")
+        except Exception as e:
+            last_error = e
+            if not isinstance(e, requests.RequestException) and "429" not in str(e):
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Groq API failure: {str(e)}"
+                )
+    
+    if isinstance(last_error, HTTPException):
+        raise last_error
+    raise HTTPException(
+        status_code=500,
+        detail=f"Groq API call failed after multiple attempts: {str(last_error)}"
+    )
+
+@router.post("/{recording_id}/analyze")
+def analyze_recording_transcript(
+    recording_id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    recording = db.query(models.Recording).filter(
+        models.Recording.id == recording_id,
+        models.Recording.user_id == current_user.id
+    ).first()
+    
+    if not recording:
+        raise HTTPException(status_code=404, detail="Recording not found")
+        
+    if recording.ai_analysis:
+        return json.loads(recording.ai_analysis)
+        
+    if not recording.transcript:
+        # Fallback to on-demand transcription first if transcript is empty/missing
+        try:
+            get_recording_transcript(recording_id, db, current_user)
+            # Re-fetch recording to get the newly generated transcript
+            db.refresh(recording)
+        except Exception as te:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No transcript exists, and on-demand transcription failed: {str(te)}"
+            )
+            
+    if not recording.transcript:
+        raise HTTPException(status_code=400, detail="Transcript is empty or unavailable.")
+        
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="Groq API Key is not configured on the server."
+        )
+        
+    try:
+        groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        
+        chunks = json.loads(recording.transcript)
+        chunks_text = "\n".join([f"[{chunk['timestamp']}] {chunk['text']}" for chunk in chunks])
+        
+        prompt = f"""
+        You are an expert communications coach and interviewer.
+        Analyze the following transcript chunks from a candidate's spoken response to the interview question: "{recording.question}".
+
+        Original response chunks:
+        ---
+        {chunks_text}
+        ---
+
+        For each 30-second chunk:
+        1. Enhance grammar, clarity, sentence structure, and professional communication.
+        2. Preserve the candidate's original intent, key points, and technical details.
+        3. Display the improved response for each original chunk so they can be matched and displayed side-by-side.
+
+        Return the output STRICTLY in JSON format matching this schema:
+        {{
+          "analysis": [
+            {{
+              "timestamp": "00:00 - 00:30",
+              "original_text": "original text here...",
+              "improved_text": "improved text here..."
+            }},
+            ...
+          ]
+        }}
+        Ensure the array of analysis has exactly the same timestamps and same number of entries as the input.
+        Do not output any introductory or concluding text, only valid JSON.
+        """
+
+        response_text = _call_groq_with_retry(prompt, groq_model, api_key)
+        data = json.loads(response_text)
+        
+        if "analysis" not in data:
+            raise ValueError("Invalid analysis structure generated by AI.")
+            
+        recording.ai_analysis = response_text
+        db.commit()
+        db.refresh(recording)
+        
+        return data
+    except Exception as e:
+        print(f"AI Analysis failed for recording {recording_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate AI analysis: {str(e)}"
+        )
+
+

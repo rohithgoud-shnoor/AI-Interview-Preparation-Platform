@@ -41,6 +41,8 @@ class Recording(BaseModel):
     video_url: str
     created_at: str
     transcript: Optional[str] = None
+    ai_analysis: Optional[str] = None
+
 
     class Config:
         from_attributes = True

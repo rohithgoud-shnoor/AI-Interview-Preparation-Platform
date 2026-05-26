@@ -233,4 +233,17 @@ export const recordingsApi = {
       },
     });
   },
+
+  /**
+   * Get AI analysis / improved version of the transcript chunks
+   */
+  analyzeTranscript: (recordingId, token) => {
+    return request(`/api/recordings/${recordingId}/analyze`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
 };
+
