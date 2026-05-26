@@ -6,13 +6,15 @@ from routers import auth, resume, recordings
 # Create the database tables
 Base.metadata.create_all(bind=engine)
 
-# Automatically add transcript column if it doesn't exist
+# Automatically add transcript and ai_analysis columns if they don't exist
 from sqlalchemy import text
 try:
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE recordings ADD COLUMN IF NOT EXISTS transcript TEXT;"))
+        conn.execute(text("ALTER TABLE recordings ADD COLUMN IF NOT EXISTS ai_analysis TEXT;"))
 except Exception as e:
-    print(f"Database migration (ALTER TABLE recordings ADD COLUMN) failed/already done: {e}")
+    print(f"Database migration failed/already done: {e}")
+
 
 app = FastAPI(title="AI Interview Platform API")
 
