@@ -19,7 +19,11 @@ const MyRecordings = () => {
   const [showAnalysis, setShowAnalysis] = useState(false);
 
 
+  const [fetchError, setFetchError] = useState('');
+
   const fetchRecordings = async () => {
+    setLoading(true);
+    setFetchError('');
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -32,10 +36,12 @@ const MyRecordings = () => {
       setRecordings(data);
     } catch (err) {
       console.error("Error fetching recordings:", err);
+      setFetchError(err.message || "Failed to fetch recordings. The API server might be starting up.");
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchRecordings();
@@ -124,12 +130,24 @@ const MyRecordings = () => {
         </div>
       </div>
 
-      {recordings.length === 0 ? (
+      {fetchError ? (
+        <div className="glass-card flex-1 flex flex-col items-center justify-center text-slate-400 gap-4">
+          <AlertCircle className="w-16 h-16 text-red-500/80 animate-bounce" />
+          <p className="text-red-400 font-medium">{fetchError}</p>
+          <button 
+            onClick={fetchRecordings}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-primary hover:bg-primary/90 text-white transition-all shadow-md active:scale-95 cursor-pointer"
+          >
+            Retry Loading
+          </button>
+        </div>
+      ) : recordings.length === 0 ? (
         <div className="glass-card flex-1 flex flex-col items-center justify-center text-slate-400 gap-4">
           <Video className="w-16 h-16 opacity-50" />
           <p>No recordings found. Start a Mock Interview to record a session!</p>
         </div>
       ) : (
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-8">
           {recordings.map((rec) => (
             <div key={rec.id} className="glass-card overflow-hidden flex flex-col group">

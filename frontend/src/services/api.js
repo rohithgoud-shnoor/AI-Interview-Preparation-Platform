@@ -219,8 +219,9 @@ export const recordingsApi = {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
-    });
+    }, 2, 1500); // Only retry 2 times with 1.5s delay for faster user feedback
   },
+
 
   /**
    * Get transcript chunks for a specific recording
