@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { recordingsApi } from '../services/api';
 import { 
   Video, Calendar, MessageSquare, AlertCircle, Loader2, Sparkles, 
-  AlertTriangle, ArrowRight, CheckCircle2, HelpCircle, Play, FileText
+  AlertTriangle, ArrowRight, CheckCircle2, HelpCircle, Play, FileText,
+  BrainCircuit
 } from 'lucide-react';
 
 const MyRecordings = () => {
