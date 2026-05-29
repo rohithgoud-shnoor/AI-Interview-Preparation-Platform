@@ -42,6 +42,8 @@ class Recording(BaseModel):
     created_at: str
     transcript: Optional[str] = None
     ai_analysis: Optional[str] = None
+    video_analysis: Optional[str] = None
+
 
 
     class Config:

@@ -3,8 +3,13 @@
  * Configures base URL using Vite environment variables and handles requests.
  */
 
-// Fallback to production URL if env variable is not set
-const API_URL = import.meta.env.VITE_API_URL || 'https://ai-interview-preparation-platform-p5g3.onrender.com';
+let API_URL = import.meta.env.VITE_API_URL || 'https://ai-interview-preparation-platform-p5g3.onrender.com';
+
+// Automatically use local backend if running on localhost or 127.0.0.1
+if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+  API_URL = 'http://localhost:8000';
+}
+
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -246,5 +251,18 @@ export const recordingsApi = {
       },
     });
   },
+
+  /**
+   * Get AI video presence analysis & suggestions
+   */
+  analyzeVideo: (recordingId, token) => {
+    return request(`/api/recordings/${recordingId}/analyze-video`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
 };
+
 

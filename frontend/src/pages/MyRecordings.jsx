@@ -33,6 +33,15 @@ const MyRecordings = () => {
   const [overallSuggestions, setOverallSuggestions] = useState([]);
   const [missingPoints, setMissingPoints] = useState([]);
 
+  // Active Tab state ('communication' or 'video')
+  const [activeTab, setActiveTab] = useState('communication');
+
+  // Video Analysis states
+  const [loadingVideoAnalysis, setLoadingVideoAnalysis] = useState(false);
+  const [videoAnalysisError, setVideoAnalysisError] = useState('');
+  const [videoAnalysisData, setVideoAnalysisData] = useState(null);
+
+
   const fetchRecordings = async () => {
     setLoading(true);
     setFetchError('');
@@ -78,6 +87,11 @@ const MyRecordings = () => {
     setOverallSuggestions([]);
     setMissingPoints([]);
 
+    // Clear video analysis state
+    setVideoAnalysisData(null);
+    setVideoAnalysisError('');
+    setActiveTab('communication');
+
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -102,6 +116,18 @@ const MyRecordings = () => {
           console.error("Failed to parse cached analysis:", e);
         }
       }
+
+      // Pre-load video analysis if it was already generated
+      if (rec.video_analysis) {
+        try {
+          const parsedVideo = JSON.parse(rec.video_analysis);
+          if (parsedVideo) {
+            setVideoAnalysisData(parsedVideo);
+          }
+        } catch (e) {
+          console.error("Failed to parse cached video analysis:", e);
+        }
+      }
     } catch (err) {
       console.error("Failed to load transcript:", err);
       setTranscriptError(err.message || "Failed to load transcript.");
@@ -109,6 +135,30 @@ const MyRecordings = () => {
       setLoadingTranscript(false);
     }
   };
+
+  const handleRunVideoAnalysis = async () => {
+    if (!selectedRecording) return;
+    setLoadingVideoAnalysis(true);
+    setVideoAnalysisError('');
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setVideoAnalysisError("You must be logged in to run video analysis.");
+        return;
+      }
+      const data = await recordingsApi.analyzeVideo(selectedRecording.id, token);
+      setVideoAnalysisData(data);
+
+      // Cache analysis in local state list
+      setRecordings(prev => prev.map(r => r.id === selectedRecording.id ? { ...r, video_analysis: JSON.stringify(data) } : r));
+    } catch (err) {
+      console.error("Failed to analyze video presence:", err);
+      setVideoAnalysisError(err.message || "Failed to generate video analysis.");
+    } finally {
+      setLoadingVideoAnalysis(false);
+    }
+  };
+
 
   const handleRunAnalysis = async () => {
     if (!selectedRecording) return;
@@ -353,146 +403,291 @@ const MyRecordings = () => {
 
             {/* Right Area: AI Insights Sidebar */}
             <div className="md:col-span-5 lg:h-full lg:overflow-y-auto flex flex-col gap-4">
-              <div className="border-b border-white/5 pb-2">
-                <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-emerald-400" />
-                  AI Communication Feedback
-                </h3>
+              <div className="flex border-b border-white/5 pb-2 gap-4">
+                <button
+                  onClick={() => setActiveTab('communication')}
+                  className={`font-bold text-sm flex items-center gap-1.5 pb-2 border-b-2 transition-all cursor-pointer ${
+                    activeTab === 'communication'
+                      ? 'text-emerald-400 border-emerald-400'
+                      : 'text-slate-400 border-transparent hover:text-white'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  AI Communication
+                </button>
+                <button
+                  onClick={() => setActiveTab('video')}
+                  className={`font-bold text-sm flex items-center gap-1.5 pb-2 border-b-2 transition-all cursor-pointer ${
+                    activeTab === 'video'
+                      ? 'text-purple-400 border-purple-400'
+                      : 'text-slate-400 border-transparent hover:text-white'
+                  }`}
+                >
+                  <Video className="w-4 h-4" />
+                  Video Analysis
+                </button>
               </div>
 
-              {loadingAnalysis ? (
-                <div className="glass-card flex-1 flex flex-col items-center justify-center py-16 gap-3 text-center">
-                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                  <div>
-                    <p className="text-white text-xs font-semibold">Running Speech Analytics...</p>
-                    <p className="text-slate-400 text-[10px] mt-1 max-w-[200px] mx-auto leading-relaxed">
-                      Measuring filler words, analyzing grammatical mistakes, and listing key details you might have missed.
-                    </p>
-                  </div>
-                </div>
-              ) : analysisChunks.length === 0 ? (
-                /* Unanalyzed State Call To Action */
-                <div className="glass-card border border-dashed border-white/10 flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400 gap-4">
-                  <BrainCircuit className="w-12 h-12 opacity-30 text-primary" />
-                  <div>
-                    <h4 className="text-xs font-semibold text-white">No Analysis Available Yet</h4>
-                    <p className="text-[10px] text-slate-500 mt-1 max-w-[200px] leading-relaxed">
-                      Analyze the full transcript to unlock visual metrics for filler words, grammar, missing topics, and suggestions.
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleRunAnalysis}
-                    disabled={loadingTranscript || !!transcriptError}
-                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-primary hover:bg-primary/90 text-white shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Run AI Analysis
-                  </button>
-                </div>
-              ) : (
-                /* Analyzed Metrics Dashboard */
-                <div className="space-y-4 pb-4 animate-in fade-in duration-300">
-                  
-                  {/* Filler Words Card */}
-                  {fillerWords && (
-                    <div className="glass-card border border-white/5 p-4 flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">Filler Words Tracker</h4>
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20">
-                          {fillerWords.total_count} detected
-                        </span>
-                      </div>
-                      
-                      {fillerWords.details && fillerWords.details.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {fillerWords.details.map((detail, idx) => (
-                            <span 
-                              key={idx} 
-                              className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-white/5 border border-white/10 flex items-center gap-1.5"
-                            >
-                              <span className="font-semibold text-amber-400">"{detail.word}"</span>
-                              <span className="text-[10px] text-slate-500">×{detail.count}</span>
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-emerald-400">Excellent speech patterns! No significant filler words detected.</p>
-                      )}
-                      
-                      <p className="text-[11px] text-slate-400 leading-relaxed italic border-t border-white/5 pt-2">
-                        {fillerWords.feedback}
+              {activeTab === 'communication' ? (
+                loadingAnalysis ? (
+                  <div className="glass-card flex-1 flex flex-col items-center justify-center py-16 gap-3 text-center">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                    <div>
+                      <p className="text-white text-xs font-semibold">Running Speech Analytics...</p>
+                      <p className="text-slate-400 text-[10px] mt-1 max-w-[200px] mx-auto leading-relaxed">
+                        Measuring filler words, analyzing grammatical mistakes, and listing key details you might have missed.
                       </p>
                     </div>
-                  )}
-
-                  {/* Missing points covered card (User Request addition) */}
-                  <div className="glass-card border border-red-500/15 bg-red-500/5 p-4 flex flex-col gap-3">
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-                      Missing Topic Coverage
-                    </h4>
+                  </div>
+                ) : analysisChunks.length === 0 ? (
+                  /* Unanalyzed State Call To Action */
+                  <div className="glass-card border border-dashed border-white/10 flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400 gap-4">
+                    <BrainCircuit className="w-12 h-12 opacity-30 text-primary" />
+                    <div>
+                      <h4 className="text-xs font-semibold text-white">No Analysis Available Yet</h4>
+                      <p className="text-[10px] text-slate-500 mt-1 max-w-[200px] leading-relaxed">
+                        Analyze the full transcript to unlock visual metrics for filler words, grammar, missing topics, and suggestions.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleRunAnalysis}
+                      disabled={loadingTranscript || !!transcriptError}
+                      className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-primary hover:bg-primary/90 text-white shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Run AI Analysis
+                    </button>
+                  </div>
+                ) : (
+                  /* Analyzed Metrics Dashboard */
+                  <div className="space-y-4 pb-4 animate-in fade-in duration-300">
                     
-                    {missingPoints && missingPoints.length > 0 ? (
+                    {/* Filler Words Card */}
+                    {fillerWords && (
+                      <div className="glass-card border border-white/5 p-4 flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Filler Words Tracker</h4>
+                          <span className="px-2 py-0.5 rounded-full text-xs font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20">
+                            {fillerWords.total_count} detected
+                          </span>
+                        </div>
+                        
+                        {fillerWords.details && fillerWords.details.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {fillerWords.details.map((detail, idx) => (
+                              <span 
+                                key={idx} 
+                                className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-white/5 border border-white/10 flex items-center gap-1.5"
+                              >
+                                <span className="font-semibold text-amber-400">"{detail.word}"</span>
+                                <span className="text-[10px] text-slate-500">×{detail.count}</span>
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-emerald-400">Excellent speech patterns! No significant filler words detected.</p>
+                        )}
+                        
+                        <p className="text-[11px] text-slate-400 leading-relaxed italic border-t border-white/5 pt-2">
+                          {fillerWords.feedback}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Missing points covered card */}
+                    <div className="glass-card border border-red-500/15 bg-red-500/5 p-4 flex flex-col gap-3">
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                        Missing Topic Coverage
+                      </h4>
+                      
+                      {missingPoints && missingPoints.length > 0 ? (
+                        <ul className="space-y-2">
+                          {missingPoints.map((pt, idx) => (
+                            <li key={idx} className="text-[11px] text-red-200 leading-relaxed flex items-start gap-2">
+                              <span className="text-red-400 font-bold mt-0.5">•</span>
+                              <span>{pt}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="flex items-center gap-2 text-emerald-400">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <span className="text-[11px] font-semibold">You covered all essential concepts for this topic!</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Suggestions Improvement Card */}
+                    <div className="glass-card border border-white/5 p-4 flex flex-col gap-3">
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
+                        Coaching & Delivery Tips
+                      </h4>
                       <ul className="space-y-2">
-                        {missingPoints.map((pt, idx) => (
-                          <li key={idx} className="text-[11px] text-red-200 leading-relaxed flex items-start gap-2">
-                            <span className="text-red-400 font-bold mt-0.5">•</span>
-                            <span>{pt}</span>
+                        {overallSuggestions.map((suggestion, idx) => (
+                          <li key={idx} className="text-[11px] text-slate-300 leading-relaxed flex items-start gap-2">
+                            <span className="text-blue-400 font-bold mt-0.5">•</span>
+                            <span>{suggestion}</span>
                           </li>
                         ))}
                       </ul>
-                    ) : (
-                      <div className="flex items-center gap-2 text-emerald-400">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        <span className="text-[11px] font-semibold">You covered all essential concepts for this topic!</span>
-                      </div>
-                    )}
-                  </div>
+                    </div>
 
-                  {/* Suggestions Improvement Card */}
-                  <div className="glass-card border border-white/5 p-4 flex flex-col gap-3">
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                      <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
-                      Coaching & Delivery Tips
-                    </h4>
-                    <ul className="space-y-2">
-                      {overallSuggestions.map((suggestion, idx) => (
-                        <li key={idx} className="text-[11px] text-slate-300 leading-relaxed flex items-start gap-2">
-                          <span className="text-blue-400 font-bold mt-0.5">•</span>
-                          <span>{suggestion}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    {/* Grammar Corrections Card */}
+                    <div className="glass-card border border-white/5 p-4 flex flex-col gap-3">
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Grammar Improvements</h4>
+                      
+                      {grammarCorrections && grammarCorrections.length > 0 ? (
+                        <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
+                          {grammarCorrections.map((corr, idx) => (
+                            <div key={idx} className="bg-white/5 rounded-lg p-2.5 border border-white/5 flex flex-col gap-1.5">
+                              <div className="flex flex-col">
+                                <span className="text-[9px] uppercase font-bold text-red-400">Said:</span>
+                                <span className="text-xs text-slate-300 line-through leading-tight">"{corr.original}"</span>
+                              </div>
+                              <div className="flex flex-col border-t border-white/5 pt-1.5">
+                                <span className="text-[9px] uppercase font-bold text-emerald-400">Correction:</span>
+                                <span className="text-xs text-emerald-100 font-medium leading-tight">"{corr.corrected}"</span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 italic mt-0.5">
+                                {corr.explanation}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-emerald-400">No grammar corrections needed for this response!</p>
+                      )}
+                    </div>
                   </div>
-
-                  {/* Grammar Corrections Card */}
-                  <div className="glass-card border border-white/5 p-4 flex flex-col gap-3">
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Grammar Improvements</h4>
+                )
+              ) : (
+                /* activeTab === 'video' */
+                loadingVideoAnalysis ? (
+                  <div className="glass-card flex-1 flex flex-col items-center justify-center py-16 gap-3 text-center">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                    <div>
+                      <p className="text-white text-xs font-semibold">Running Video Presence Coach...</p>
+                      <p className="text-slate-400 text-[10px] mt-1 max-w-[200px] mx-auto leading-relaxed">
+                        Analyzing sitting posture, camera angle/positioning, eye contact patterns, and environmental lighting.
+                      </p>
+                    </div>
+                  </div>
+                ) : videoAnalysisError ? (
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-center">
+                    <p className="text-red-400 text-xs font-medium">{videoAnalysisError}</p>
+                    <button
+                      onClick={handleRunVideoAnalysis}
+                      className="mt-3 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 text-xs font-semibold rounded-lg transition-all"
+                    >
+                      Retry Analysis
+                    </button>
+                  </div>
+                ) : !videoAnalysisData ? (
+                  /* Unanalyzed video state CTA */
+                  <div className="glass-card border border-dashed border-white/10 flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400 gap-4">
+                    <Video className="w-12 h-12 opacity-30 text-primary" />
+                    <div>
+                      <h4 className="text-xs font-semibold text-white">No Video Analysis Available Yet</h4>
+                      <p className="text-[10px] text-slate-500 mt-1 max-w-[200px] leading-relaxed">
+                        Get automated feedback on how you sit, camera positioning, eye contact, and background lighting.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleRunVideoAnalysis}
+                      className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-primary hover:bg-primary/90 text-white shadow-md active:scale-95 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Run Video Analysis
+                    </button>
+                  </div>
+                ) : (
+                  /* Analyzed Video Metrics Dashboard */
+                  <div className="space-y-4 pb-4 animate-in fade-in duration-300">
                     
-                    {grammarCorrections && grammarCorrections.length > 0 ? (
-                      <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
-                        {grammarCorrections.map((corr, idx) => (
-                          <div key={idx} className="bg-white/5 rounded-lg p-2.5 border border-white/5 flex flex-col gap-1.5">
-                            <div className="flex flex-col">
-                              <span className="text-[9px] uppercase font-bold text-red-400">Said:</span>
-                              <span className="text-xs text-slate-300 line-through leading-tight">"{corr.original}"</span>
-                            </div>
-                            <div className="flex flex-col border-t border-white/5 pt-1.5">
-                              <span className="text-[9px] uppercase font-bold text-emerald-400">Correction:</span>
-                              <span className="text-xs text-emerald-100 font-medium leading-tight">"{corr.corrected}"</span>
-                            </div>
-                            <p className="text-[10px] text-slate-400 italic mt-0.5">
-                              {corr.explanation}
-                            </p>
-                          </div>
-                        ))}
+                    {/* Posture & Body Language */}
+                    <div className="glass-card border border-white/5 p-4 flex flex-col gap-2">
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-violet-400"></span>
+                        Sitting Posture & Body Language
+                      </h4>
+                      <div className="mt-2 text-xs">
+                        <span className="text-[10px] uppercase font-bold text-violet-400 block">Analysis:</span>
+                        <p className="text-slate-300 leading-relaxed mt-0.5">{videoAnalysisData.posture.analysis}</p>
                       </div>
-                    ) : (
-                      <p className="text-[11px] text-emerald-400">No grammar corrections needed for this response!</p>
-                    )}
-                  </div>
+                      <div className="mt-2 text-xs border-t border-white/5 pt-2">
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 block">Suggestion:</span>
+                        <p className="text-slate-300 leading-relaxed mt-0.5">{videoAnalysisData.posture.suggestion}</p>
+                      </div>
+                    </div>
 
-                </div>
+                    {/* Camera Positioning & Framing */}
+                    <div className="glass-card border border-white/5 p-4 flex flex-col gap-2">
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                        Camera Position & Framing
+                      </h4>
+                      <div className="mt-2 text-xs">
+                        <span className="text-[10px] uppercase font-bold text-blue-400 block">Analysis:</span>
+                        <p className="text-slate-300 leading-relaxed mt-0.5">{videoAnalysisData.camera_position.analysis}</p>
+                      </div>
+                      <div className="mt-2 text-xs border-t border-white/5 pt-2">
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 block">Suggestion:</span>
+                        <p className="text-slate-300 leading-relaxed mt-0.5">{videoAnalysisData.camera_position.suggestion}</p>
+                      </div>
+                    </div>
+
+                    {/* Eye Contact & Visual Engagement */}
+                    <div className="glass-card border border-white/5 p-4 flex flex-col gap-2">
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-pink-400"></span>
+                        Eye Contact & Visual Engagement
+                      </h4>
+                      <div className="mt-2 text-xs">
+                        <span className="text-[10px] uppercase font-bold text-pink-400 block">Analysis:</span>
+                        <p className="text-slate-300 leading-relaxed mt-0.5">{videoAnalysisData.eye_contact.analysis}</p>
+                      </div>
+                      <div className="mt-2 text-xs border-t border-white/5 pt-2">
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 block">Suggestion:</span>
+                        <p className="text-slate-300 leading-relaxed mt-0.5">{videoAnalysisData.eye_contact.suggestion}</p>
+                      </div>
+                    </div>
+
+                    {/* Lighting & Environment */}
+                    <div className="glass-card border border-white/5 p-4 flex flex-col gap-2">
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                        Background & Lighting
+                      </h4>
+                      <div className="mt-2 text-xs">
+                        <span className="text-[10px] uppercase font-bold text-amber-400 block">Analysis:</span>
+                        <p className="text-slate-300 leading-relaxed mt-0.5">{videoAnalysisData.background.analysis}</p>
+                      </div>
+                      <div className="mt-2 text-xs border-t border-white/5 pt-2">
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 block">Suggestion:</span>
+                        <p className="text-slate-300 leading-relaxed mt-0.5">{videoAnalysisData.background.suggestion}</p>
+                      </div>
+                    </div>
+
+                    {/* Overall Recommendations */}
+                    <div className="glass-card border border-white/5 p-4 flex flex-col gap-3">
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
+                        Visual Coach Action Items
+                      </h4>
+                      <ul className="space-y-2">
+                        {videoAnalysisData.overall_suggestions.map((suggestion, idx) => (
+                          <li key={idx} className="text-[11px] text-slate-300 leading-relaxed flex items-start gap-2">
+                            <span className="text-blue-400 font-bold mt-0.5">•</span>
+                            <span>{suggestion}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                  </div>
+                )
               )}
             </div>
 
@@ -505,3 +700,4 @@ const MyRecordings = () => {
 };
 
 export default MyRecordings;
+

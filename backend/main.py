@@ -1,19 +1,32 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
+import models
 from routers import auth, resume, recordings
 
 # Create the database tables
 Base.metadata.create_all(bind=engine)
 
-# Automatically add transcript and ai_analysis columns if they don't exist
+
+# Automatically add transcript, ai_analysis, and video_analysis columns if they don't exist
 from sqlalchemy import text
 try:
     with engine.begin() as conn:
-        conn.execute(text("ALTER TABLE recordings ADD COLUMN IF NOT EXISTS transcript TEXT;"))
-        conn.execute(text("ALTER TABLE recordings ADD COLUMN IF NOT EXISTS ai_analysis TEXT;"))
+        # Run each migration in its own try/except block to avoid failure if column already exists (especially for SQLite)
+        for col in ["transcript", "ai_analysis", "video_analysis"]:
+            try:
+                # PostgreSQL support
+                if engine.url.drivername.startswith("postgresql"):
+                    conn.execute(text(f"ALTER TABLE recordings ADD COLUMN IF NOT EXISTS {col} TEXT;"))
+                else:
+                    # SQLite support (no IF NOT EXISTS, so try and catch error if it already exists)
+                    conn.execute(text(f"ALTER TABLE recordings ADD COLUMN {col} TEXT;"))
+            except Exception as col_err:
+                # Column might already exist, which is expected
+                print(f"Column migration info for {col}: {col_err}")
 except Exception as e:
     print(f"Database migration failed/already done: {e}")
+
 
 
 app = FastAPI(title="AI Interview Platform API")

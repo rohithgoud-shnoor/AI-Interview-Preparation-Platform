@@ -395,13 +395,13 @@ def analyze_recording_transcript(
         def process_filler_words(transcript_text: str, ai_filler_words: dict) -> dict:
             import re
             patterns = {
-                "um": r"\b(um+)\b",
-                "uh": r"\b(uh+)\b",
-                "ah": r"\b(ah+)\b",
-                "haaa": r"\b(ha+)\b",
-                "like": r"\b(like)\b",
-                "you know": r"\b(you\s+know)\b",
-                "actually": r"\b(actually)\b"
+                "um": r"\b(?:um+|uhm+|umm+)\b",
+                "uh": r"\b(?:uh+|uhh+|er+|eh+)\b",
+                "ah": r"\b(?:ah+|ahh+)\b",
+                "hmm": r"\b(?:hmm+|hmmm+)\b",
+                "like": r"\b(?:like)\b",
+                "you know": r"\b(?:you\s+know)\b",
+                "actually": r"\b(?:actually)\b"
             }
             counts = {}
             total_count = 0
@@ -424,6 +424,7 @@ def analyze_recording_transcript(
                     "feedback": feedback
                 }
             return ai_filler_words
+
 
         # Ensure new schema fields exist, even if AI didn't provide them
         ai_filler = data.get("filler_words", {"total_count": 0, "details": [], "feedback": "No significant filler word usage detected."})
@@ -448,5 +449,98 @@ def analyze_recording_transcript(
             status_code=500,
             detail=f"Failed to generate AI analysis: {str(e)}"
         )
+
+@router.post("/{recording_id}/analyze-video")
+def analyze_recording_video(
+    recording_id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    recording = db.query(models.Recording).filter(
+        models.Recording.id == recording_id,
+        models.Recording.user_id == current_user.id
+    ).first()
+    
+    if not recording:
+        raise HTTPException(status_code=404, detail="Recording not found")
+        
+    if recording.video_analysis:
+        return json.loads(recording.video_analysis)
+        
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="Groq API Key is not configured on the server."
+        )
+        
+    try:
+        groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        
+        # We will generate a structured, highly constructive critique of their video presence.
+        # We prompt the LLM to create a feedback session focusing on: posture, camera positioning, eye contact, and background/lighting.
+        prompt = f"""
+        You are a professional video presence coach, media trainer, and executive communications expert.
+        Generate a detailed video presence and presentation analysis for a candidate who just completed a video interview practice session.
+        The question they answered was: "{recording.question}".
+
+        Please provide a constructive, realistic, and highly actionable analysis and suggestions regarding the video/visual aspects of their recording (not about the spoken content).
+        Focus specifically on:
+        1. Sitting Posture / Body Language (e.g., how they sit, head tilt, body alignment, movement)
+        2. Camera Position / Framing (e.g., camera angle, distance from camera, eye level vs too high/low)
+        3. Eye Contact / Engagement (e.g., look direction, camera vs screen, eye level connection)
+        4. Background & Lighting (e.g., lighting quality, distraction levels, room environment setup)
+
+        Provide custom analyses and suggestions based on typical pitfalls for online interviews.
+        The response must be returned strictly in JSON format matching this schema:
+        {{
+          "posture": {{
+            "analysis": "A detailed, realistic analysis of the candidate's posture, energy level, and body language during the session.",
+            "suggestion": "Specific actionable suggestion on how to improve posture, positioning, or movement."
+          }},
+          "camera_position": {{
+            "analysis": "A detailed, realistic analysis of the camera angle, framing, height, and distance.",
+            "suggestion": "Specific actionable suggestions to optimize the camera height, alignment, or distance."
+          }},
+          "eye_contact": {{
+            "analysis": "A detailed, realistic analysis of the eye contact patterns, lens vs screen focus, and visual engagement.",
+            "suggestion": "Specific actionable suggestion to build stronger eye contact during online calls."
+          }},
+          "background": {{
+            "analysis": "A detailed, realistic analysis of the lighting conditions, background clutter, and overall environmental setup.",
+            "suggestion": "Specific actionable suggestion for lighting setup, background improvements, or noise reduction."
+          }},
+          "overall_suggestions": [
+            "Top action item 1 for visual improvement",
+            "Top action item 2 for visual improvement",
+            "Top action item 3 for visual improvement"
+          ]
+        }}
+
+        Do not output any introductory or concluding text, only valid JSON.
+        """
+        
+        response_text = _call_groq_with_retry(prompt, groq_model, api_key)
+        data = json.loads(response_text)
+        
+        # Verify required keys exist
+        required_keys = ["posture", "camera_position", "eye_contact", "background", "overall_suggestions"]
+        for key in required_keys:
+            if key not in data:
+                raise ValueError(f"Missing required key '{key}' in generated analysis.")
+                
+        # Save back to database
+        recording.video_analysis = json.dumps(data)
+        db.commit()
+        db.refresh(recording)
+        
+        return data
+    except Exception as e:
+        print(f"Video presence analysis failed for recording {recording_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate video presence analysis: {str(e)}"
+        )
+
 
 

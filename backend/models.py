@@ -30,5 +30,6 @@ class Recording(Base):
     created_at = Column(String)
     transcript = Column(Text, nullable=True)
     ai_analysis = Column(Text, nullable=True)
+    video_analysis = Column(Text, nullable=True)
 
 
