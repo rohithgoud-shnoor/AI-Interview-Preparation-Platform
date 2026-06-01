@@ -4,7 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { authApi, recordingsApi, resumeApi } from '../services/api';
 import { 
   Video, FileText, Award, Activity, Sparkles, Calendar, 
-  ArrowRight, CheckCircle2, HelpCircle, AlertCircle, Play, Loader2
+  ArrowRight, CheckCircle2, HelpCircle, AlertCircle, Play, Loader2, User
 } from 'lucide-react';
 
 const StatCard = ({ title, value, subtitle, subtitleColor, icon: Icon }) => (
@@ -30,6 +30,7 @@ const StatCard = ({ title, value, subtitle, subtitleColor, icon: Icon }) => (
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState(localStorage.getItem('user_name') || 'Candidate');
+  const [profilePicture, setProfilePicture] = useState('');
   
   // Real-time states
   const [recordings, setRecordings] = useState([]);
@@ -47,6 +48,16 @@ const Dashboard = () => {
   const [chartData, setChartData] = useState([]);
   const [recentInterviews, setRecentInterviews] = useState([]);
 
+  // Helper to resolve profile picture url
+  const getProfilePictureUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('http')) return path;
+    const backendBaseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? 'http://localhost:8000' 
+      : 'https://ai-interview-preparation-platform-p5g3.onrender.com';
+    return `${backendBaseUrl}${path}`;
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true);
@@ -60,6 +71,7 @@ const Dashboard = () => {
         // 1. Fetch User details
         const userData = await authApi.getMe(token);
         setName(userData.name);
+        setProfilePicture(userData.profile_picture || '');
         localStorage.setItem('user_name', userData.name);
 
         // 2. Fetch Resume Upload Status
@@ -88,20 +100,26 @@ const Dashboard = () => {
           if (rec.ai_analysis) {
             try {
               const parsedAnalysis = JSON.parse(rec.ai_analysis);
-              const score = parsedAnalysis.overall_score;
-              if (score !== undefined) {
-                scoreSum += score;
-                analyzedCount++;
-
-                // Format date for chart: e.g., "May 12"
-                const dateObj = new Date(rec.created_at);
-                const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                
-                parsedChartPoints.push({
-                  name: formattedDate,
-                  score: score
-                });
+              let score = parsedAnalysis.overall_score;
+              
+              // Fallback calculation for existing videos that already have analysis
+              if (score === undefined) {
+                const fillerCount = parsedAnalysis.filler_words?.total_count || 0;
+                const missingCount = parsedAnalysis.missing_points?.length || 0;
+                score = Math.max(50, 95 - (fillerCount * 2) - (missingCount * 5));
               }
+
+              scoreSum += score;
+              analyzedCount++;
+
+              // Format date for chart: e.g., "May 12"
+              const dateObj = new Date(rec.created_at);
+              const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              
+              parsedChartPoints.push({
+                name: formattedDate,
+                score: score
+              });
             } catch (e) {
               console.error("Error parsing ai_analysis for recording", rec.id, e);
             }
@@ -161,13 +179,31 @@ const Dashboard = () => {
           </h2>
           <p className="text-slate-400 text-sm font-medium">Keep practicing and polish your communication & technical skills!</p>
         </div>
-        <Link 
-          to="/dashboard/interview"
-          className="hidden md:flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-primary to-secondary text-white text-xs font-semibold hover:shadow-[0_0_15px_rgba(147,51,234,0.3)] transition-all active:scale-95 cursor-pointer"
-        >
-          Start Practice
-          <ArrowRight className="w-4 h-4" />
-        </Link>
+        <div className="flex items-center gap-4 shrink-0">
+          <Link 
+            to="/dashboard/profile" 
+            title="Go to Profile"
+            className="w-10 h-10 rounded-full border-2 border-slate-700 hover:border-primary bg-slate-950 flex items-center justify-center overflow-hidden transition-all shadow-md shrink-0 aspect-square"
+          >
+            {profilePicture ? (
+              <img 
+                src={getProfilePictureUrl(profilePicture)} 
+                alt="Profile" 
+                className="w-full h-full object-cover object-center rounded-full shrink-0 select-none block"
+              />
+            ) : (
+              <User className="w-5 h-5 text-slate-400 shrink-0" />
+            )}
+          </Link>
+          
+          <Link 
+            to="/dashboard/interview"
+            className="hidden md:flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-primary to-secondary text-white text-xs font-semibold hover:shadow-[0_0_15px_rgba(147,51,234,0.3)] transition-all active:scale-95 cursor-pointer"
+          >
+            Start Practice
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       </div>
 
       {/* Real-time Top Stats Row */}
@@ -317,14 +353,18 @@ const Dashboard = () => {
                 if (item.ai_analysis) {
                   try {
                     const parsed = JSON.parse(item.ai_analysis);
-                    if (parsed.overall_score !== undefined) {
-                      score = `${parsed.overall_score}%`;
-                      scoreColor = parsed.overall_score >= 80 
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                        : parsed.overall_score >= 60 
-                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
-                        : 'bg-red-500/10 text-red-400 border border-red-500/20';
+                    let overallScore = parsed.overall_score;
+                    if (overallScore === undefined) {
+                      const fillerCount = parsed.filler_words?.total_count || 0;
+                      const missingCount = parsed.missing_points?.length || 0;
+                      overallScore = Math.max(50, 95 - (fillerCount * 2) - (missingCount * 5));
                     }
+                    score = `${overallScore}%`;
+                    scoreColor = overallScore >= 80 
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                      : overallScore >= 60 
+                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                      : 'bg-red-500/10 text-red-400 border border-red-500/20';
                   } catch (e) {}
                 }
 

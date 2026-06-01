@@ -232,3 +232,24 @@ def _save_profile_picture_locally(file: UploadFile, current_user: models.User, d
         return current_user
     except Exception as e:
          raise HTTPException(status_code=500, detail=f"Failed to save profile picture locally: {str(e)}")
+
+@router.delete("/profile/picture", response_model=schemas.User)
+def delete_profile_picture(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # If the user has a profile picture and it is saved locally, delete the physical file to prevent storage leaks
+    if current_user.profile_picture and current_user.profile_picture.startswith("/uploads/profile_pictures/"):
+        try:
+            BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            filename = os.path.basename(current_user.profile_picture)
+            file_path = os.path.join(BACKEND_DIR, "uploads", "profile_pictures", filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            print(f"Error deleting local profile picture file: {e}")
+            
+    current_user.profile_picture = None
+    db.commit()
+    db.refresh(current_user)
+    return current_user

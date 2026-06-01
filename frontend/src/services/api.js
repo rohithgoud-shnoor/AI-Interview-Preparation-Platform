@@ -150,6 +150,18 @@ export const authApi = {
       },
     });
   },
+
+  /**
+   * Delete user profile picture
+   */
+  deleteProfilePicture: (token) => {
+    return request('/api/auth/profile/picture', {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
 };
 
 /**

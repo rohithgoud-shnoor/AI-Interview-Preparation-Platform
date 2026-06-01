@@ -147,10 +147,35 @@ const Profile = () => {
         profile_picture: data.profile_picture
       }));
       setSuccessMsg('Profile picture updated!');
+      // Trigger header bar refresh
+      window.dispatchEvent(new Event('storage'));
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
       console.error('Error uploading avatar:', err);
       setErrorMsg(err.message || 'Failed to upload profile picture.');
+    } finally {
+      setUploadingPic(false);
+    }
+  };
+
+  const handleRemovePicture = async () => {
+    if (!window.confirm('Are you sure you want to remove your profile picture?')) return;
+    setUploadingPic(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      await authApi.deleteProfilePicture(token);
+      setFormData(prev => ({
+        ...prev,
+        profile_picture: ''
+      }));
+      setSuccessMsg('Profile picture removed successfully.');
+      // Trigger header bar refresh
+      window.dispatchEvent(new Event('storage'));
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      console.error('Error removing avatar:', err);
+      setErrorMsg(err.message || 'Failed to remove profile picture.');
     } finally {
       setUploadingPic(false);
     }
@@ -345,25 +370,24 @@ const Profile = () => {
         <div className="lg:col-span-4 glass-card p-6 flex flex-col items-center justify-center text-center space-y-6 order-1 lg:order-2">
           <div className="w-full flex items-center justify-between pb-2 border-b border-white/5">
             <h3 className="text-sm font-semibold text-slate-300">Profile Picture</h3>
-            <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Top Right Card</span>
           </div>
 
           <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
             {/* Round Avatar Container */}
-            <div className="w-44 h-44 rounded-full overflow-hidden border-4 border-slate-800 bg-slate-950 flex items-center justify-center shadow-2xl relative transition-all duration-300 group-hover:border-primary/60">
+            <div className="w-44 h-44 rounded-full overflow-hidden border-4 border-slate-800 bg-slate-950 flex items-center justify-center shadow-2xl relative transition-all duration-300 group-hover:border-primary/60 aspect-square shrink-0">
               
               {avatarUrl ? (
                 <img 
                   src={avatarUrl} 
                   alt="Profile" 
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover object-center rounded-full shrink-0 select-none block"
                 />
               ) : (
                 <User className="w-20 h-20 text-slate-600" />
               )}
 
               {/* Upload Hover Overlay */}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 duration-300">
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 duration-300 rounded-full">
                 <Camera className="w-8 h-8 text-primary" />
                 <span className="text-[10px] font-semibold uppercase tracking-wider">Upload New</span>
               </div>
@@ -378,7 +402,7 @@ const Profile = () => {
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3 w-full">
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -386,14 +410,26 @@ const Profile = () => {
               accept=".jpg,.jpeg,.png,.webp,.gif"
               onChange={handleFileChange}
             />
-            <button
-              onClick={handleAvatarClick}
-              disabled={uploadingPic}
-              className="px-4 py-2 border border-white/10 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-            >
-              Update Image
-            </button>
-            <p className="text-[10px] text-slate-500 leading-normal max-w-[200px]">
+            <div className="flex flex-col gap-2 w-full max-w-[200px] mx-auto">
+              <button
+                onClick={handleAvatarClick}
+                disabled={uploadingPic}
+                className="w-full px-4 py-2.5 border border-white/10 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                Update Image
+              </button>
+              
+              {formData.profile_picture && (
+                <button
+                  onClick={handleRemovePicture}
+                  disabled={uploadingPic}
+                  className="w-full px-4 py-2.5 border border-red-500/20 rounded-xl text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  Remove Picture
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-500 leading-normal max-w-[200px] mx-auto">
               JPG, PNG or WEBP formats. Max file size limit is 5MB.
             </p>
           </div>
