@@ -27,11 +27,8 @@ const Sidebar = () => {
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Mock Interview', path: '/dashboard/interview', icon: MessageSquare },
     { name: 'Resume', path: '/dashboard/resume', icon: Upload },
-    { name: 'Weak Topics', path: '/dashboard/weak-topics', icon: Target },
-    { name: 'Reports', path: '/dashboard/analytics', icon: BarChart3 },
     { name: 'Profile', path: '/dashboard/profile', icon: User },
     { name: 'My Recordings', path: '/dashboard/recordings', icon: Video },
-    { name: 'Settings', path: '/dashboard/settings', icon: Settings },
   ];
 
   return (

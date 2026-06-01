@@ -9,6 +9,7 @@ import MyRecordings from './pages/MyRecordings';
 import Analytics from './pages/Analytics';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import Profile from './pages/Profile';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="resume" element={<ResumeUpload />} />
           <Route path="interview" element={<MockInterview />} />
+          <Route path="profile" element={<Profile />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="recordings" element={<MyRecordings />} />
         </Route>

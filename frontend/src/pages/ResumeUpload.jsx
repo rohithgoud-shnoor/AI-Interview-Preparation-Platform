@@ -193,6 +193,10 @@ const ResumeUpload = () => {
     try {
       const data = await resumeApi.submitFeedback(questions, finalAnswers, token);
       setFeedback(data);
+      if (data && data.overall_score !== undefined) {
+        localStorage.setItem('resume_match_score', data.overall_score);
+        localStorage.setItem('resume_questions_attempted', questions.length || 10);
+      }
       setStatus('feedback');
     } catch (err) {
       console.error('Error getting feedback:', err);

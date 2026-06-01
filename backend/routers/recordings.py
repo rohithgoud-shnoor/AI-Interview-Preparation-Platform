@@ -347,9 +347,11 @@ def analyze_recording_transcript(
         3. Extract specific grammar issues found (if any), detailing the original phrasing, the corrected phrasing, and an explanation of the grammar rule/correction.
         4. Provide general overall professional suggestions to make the response sound more authoritative, structured, and polished.
         5. Analyze the candidate's response in relation to the interview question topic. Identify any missing key concepts, points, technologies, or details that are industry standards or expected details for this question that the candidate should have covered.
+        6. Provide an overall score (percentage, 0-100) representing the combined quality of their communication, technical accuracy, and structure.
 
         Return the output STRICTLY in JSON format matching this schema:
         {{
+          "overall_score": 85,
           "analysis": [
             {{
               "timestamp": "00:00 - 00:30",
@@ -436,6 +438,12 @@ def analyze_recording_transcript(
             data["overall_suggestions"] = ["Good response. Try practice pacing your delivery."]
         if "missing_points" not in data:
             data["missing_points"] = []
+            
+        if "overall_score" not in data:
+            filler_count = data.get("filler_words", {}).get("total_count", 0)
+            missing_count = len(data.get("missing_points", []))
+            calculated_score = max(50, 95 - (filler_count * 2) - (missing_count * 5))
+            data["overall_score"] = calculated_score
 
         # Save the full enriched object back to database
         recording.ai_analysis = json.dumps(data)

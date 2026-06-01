@@ -124,6 +124,32 @@ export const authApi = {
       },
     });
   },
+
+  /**
+   * Update user profile details
+   */
+  updateProfile: (profileData, token) => {
+    return request('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
+
+  /**
+   * Upload user profile picture
+   */
+  uploadProfilePicture: (formData, token) => {
+    return request('/api/auth/profile/picture', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+  },
 };
 
 /**

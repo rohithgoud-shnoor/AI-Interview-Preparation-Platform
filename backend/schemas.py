@@ -4,6 +4,10 @@ from pydantic import BaseModel, EmailStr
 class UserBase(BaseModel):
     name: str
     email: EmailStr
+    phone_number: Optional[str] = None
+    college_name: Optional[str] = None
+    specialization: Optional[str] = None
+    profile_picture: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str

@@ -1,10 +1,12 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
 from jose import jwt
 import os
+import shutil
+from pydantic import BaseModel
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
@@ -132,3 +134,101 @@ def google_login(request_data: schemas.GoogleLoginRequest, db: Session = Depends
 @router.get("/me", response_model=schemas.User)
 def get_me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+class ProfileUpdate(BaseModel):
+    name: str
+    email: str
+    phone_number: Optional[str] = None
+    college_name: Optional[str] = None
+    specialization: Optional[str] = None
+
+@router.put("/profile", response_model=schemas.User)
+def update_profile(
+    profile_data: ProfileUpdate,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Check if another user has this email
+    if profile_data.email != current_user.email:
+        existing_user = crud.get_user_by_email(db, email=profile_data.email)
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email is already in use by another account.")
+        current_user.email = profile_data.email
+        
+    current_user.name = profile_data.name
+    current_user.phone_number = profile_data.phone_number
+    current_user.college_name = profile_data.college_name
+    current_user.specialization = profile_data.specialization
+    
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+@router.post("/profile/picture", response_model=schemas.User)
+def upload_profile_picture(
+    file: UploadFile = File(...),
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Ensure it's an image
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG, GIF, and WEBP image formats are supported.")
+        
+    # Check if Cloudinary is configured
+    cloudinary_cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME")
+    
+    if cloudinary_cloud_name:
+        try:
+            import cloudinary
+            import cloudinary.uploader
+            
+            # Setup Cloudinary config just in case it isn't set globally on this router
+            cloudinary.config(
+                cloud_name=cloudinary_cloud_name,
+                api_key=os.getenv("CLOUDINARY_API_KEY"),
+                api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+                secure=True,
+            )
+            
+            # Upload to Cloudinary
+            result = cloudinary.uploader.upload(
+                file.file,
+                folder="profile_pictures",
+                public_id=f"user_{current_user.id}",
+                overwrite=True,
+                resource_type="image"
+            )
+            current_user.profile_picture = result.get("secure_url")
+            db.commit()
+            db.refresh(current_user)
+            return current_user
+        except Exception as e:
+            print(f"Cloudinary profile picture upload error: {e}")
+            # Fall back to local upload if Cloudinary fails
+            return _save_profile_picture_locally(file, current_user, db)
+    else:
+        return _save_profile_picture_locally(file, current_user, db)
+
+def _save_profile_picture_locally(file: UploadFile, current_user: models.User, db: Session):
+    # Determine save path relative to backend dir
+    BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    UPLOAD_DIR = os.path.join(BACKEND_DIR, "uploads", "profile_pictures")
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    filename = f"user_{current_user.id}{file_ext}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    
+    try:
+        file.file.seek(0)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # Set relative URL path
+        current_user.profile_picture = f"/uploads/profile_pictures/{filename}"
+        db.commit()
+        db.refresh(current_user)
+        return current_user
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=f"Failed to save profile picture locally: {str(e)}")
