@@ -14,11 +14,22 @@ export default defineConfig(({ mode }) => ({
     // which directly improves FCP, LCP, and TBT scores.
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react':  ['react', 'react-dom', 'react-router-dom'],
-          'vendor-motion': ['framer-motion'],
-          'vendor-charts': ['recharts'],
-          'vendor-icons':  ['lucide-react'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react/') || id.includes('react-dom/') || id.includes('react-router-dom/')) {
+              return 'vendor-react';
+            }
+            if (id.includes('framer-motion/')) {
+              return 'vendor-motion';
+            }
+            if (id.includes('recharts/')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('lucide-react/')) {
+              return 'vendor-icons';
+            }
+            return 'vendor';
+          }
         },
       },
     },

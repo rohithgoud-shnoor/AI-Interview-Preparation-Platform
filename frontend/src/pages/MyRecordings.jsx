@@ -210,7 +210,7 @@ const MyRecordings = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-6rem)] flex flex-col gap-6">
+    <div className="lg:h-[calc(100vh-6rem)] flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/5 pb-4">
         <div className="flex items-center gap-3">
@@ -244,10 +244,10 @@ const MyRecordings = () => {
         </div>
       ) : (
         /* Main Responsive Split Layout */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-12rem)] overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[calc(100vh-12rem)] lg:overflow-hidden">
           
           {/* Left Panel: Scrollable Recording List Sidebar */}
-          <div className="lg:col-span-3 h-full flex flex-col gap-4 overflow-y-auto pr-1">
+          <div className="lg:col-span-3 lg:h-full flex flex-col gap-4 lg:overflow-y-auto pr-1">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1 mb-1">
               Select Session ({recordings.length})
             </h3>
@@ -287,7 +287,7 @@ const MyRecordings = () => {
           </div>
 
           {/* Right Workspace: Selected Video Details & AI Insights */}
-          <div className="lg:col-span-9 h-full grid grid-cols-1 md:grid-cols-12 gap-6 overflow-y-auto lg:overflow-hidden pb-8 pr-1">
+          <div className="lg:col-span-9 lg:h-full grid grid-cols-1 md:grid-cols-12 gap-6 lg:overflow-hidden pb-8 pr-1">
             
             {/* Center Area: Video Player & Youtube-like Comments/Transcript */}
             <div className="md:col-span-7 lg:h-full lg:overflow-y-auto flex flex-col gap-4">

@@ -105,12 +105,34 @@ const MockInterview = () => {
   // Free-plan gate
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [checkingLimit, setCheckingLimit] = useState(false);
+  const [recordingsCount, setRecordingsCount] = useState(0);
 
   const FREE_LIMIT = 3;
 
   const videoRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
+
+  // Check free-plan limit on mount to block early
+  useEffect(() => {
+    const fetchLimit = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const recordings = await recordingsApi.getMyRecordings(token);
+          if (recordings) {
+            setRecordingsCount(recordings.length);
+            if (recordings.length >= FREE_LIMIT) {
+              setShowPremiumModal(true);
+            }
+          }
+        } catch (err) {
+          console.warn('Could not check recording count on mount:', err);
+        }
+      }
+    };
+    fetchLimit();
+  }, []);
 
   /* ── Check recording count before starting ── */
   const handleStartInterview = async () => {
@@ -119,12 +141,18 @@ const MockInterview = () => {
       return;
     }
 
-    // Check free-plan limit
+    if (recordingsCount >= FREE_LIMIT) {
+      setShowPremiumModal(true);
+      return;
+    }
+
+    // Check free-plan limit again to be sure
     setCheckingLimit(true);
     try {
       const token = localStorage.getItem('token');
       if (token) {
         const recordings = await recordingsApi.getMyRecordings(token);
+        setRecordingsCount(recordings.length);
         if (recordings.length >= FREE_LIMIT) {
           setShowPremiumModal(true);
           setCheckingLimit(false);
@@ -132,7 +160,12 @@ const MockInterview = () => {
         }
       }
     } catch (err) {
-      // If we can't fetch, allow the user to continue (fail open)
+      // If error occurs, fail-safe block if we already think count is over
+      if (recordingsCount >= FREE_LIMIT) {
+        setShowPremiumModal(true);
+        setCheckingLimit(false);
+        return;
+      }
       console.warn('Could not check recording count:', err);
     } finally {
       setCheckingLimit(false);
@@ -221,8 +254,8 @@ const MockInterview = () => {
       <>
         {showPremiumModal && <PremiumModal onClose={() => setShowPremiumModal(false)} />}
 
-        <div className="h-[calc(100vh-6rem)] flex items-center justify-center">
-          <div className="glass-card p-8 max-w-lg w-full">
+        <div className="min-h-[calc(100vh-6rem)] py-6 flex items-center justify-center p-4">
+          <div className="glass-card p-6 md:p-8 max-w-lg w-full">
             <h2 className="text-2xl font-bold text-white mb-6 text-center">Start Mock Interview</h2>
             <div className="flex flex-col gap-4">
               <label htmlFor="interview-question" className="text-sm text-slate-300 font-medium">
@@ -252,8 +285,8 @@ const MockInterview = () => {
 
   /* ── Active interview screen ── */
   return (
-    <div className="h-[calc(100vh-6rem)] flex items-center justify-center p-6">
-      <div className="w-full max-w-5xl h-full glass-card relative overflow-hidden bg-slate-900 rounded-3xl shadow-2xl">
+    <div className="min-h-[calc(100vh-6rem)] py-6 flex items-center justify-center p-4 md:p-6">
+      <div className="w-full max-w-5xl h-full min-h-[450px] glass-card relative overflow-hidden bg-slate-900 rounded-3xl shadow-2xl">
 
         {/* Video / avatar */}
         {!isVideoOn ? (
@@ -274,7 +307,7 @@ const MockInterview = () => {
         )}
 
         {/* Name tag + REC indicator */}
-        <div className="absolute bottom-6 left-6 px-4 py-2 rounded-lg bg-black/60 backdrop-blur-md text-white font-medium shadow-lg flex items-center gap-2">
+        <div className="absolute top-6 left-6 px-4 py-2 rounded-lg bg-black/60 backdrop-blur-md text-white font-medium shadow-lg flex items-center gap-2 z-10">
           You {isRecording && (
             <span className="text-red-500 animate-pulse font-bold flex items-center gap-1">
               <Circle className="w-3 h-3" fill="currentColor" aria-hidden="true" /> REC
@@ -283,7 +316,7 @@ const MockInterview = () => {
         </div>
 
         {/* Controls */}
-        <div className="absolute bottom-6 right-6 flex items-center gap-4">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 z-10 w-max max-w-[95vw] justify-center">
 
           {/* Record / Stop */}
           {!isRecording ? (

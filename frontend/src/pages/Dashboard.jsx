@@ -171,7 +171,7 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <div className="flex justify-between items-center bg-slate-900/40 border border-white/5 p-6 rounded-2xl relative overflow-hidden">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/40 border border-white/5 p-6 rounded-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-44 h-44 bg-primary/5 blur-[40px] rounded-full pointer-events-none" />
         <div className="space-y-1">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">

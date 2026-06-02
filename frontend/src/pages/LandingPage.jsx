@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles, BrainCircuit, Target, Video } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const FeatureCard = ({ icon: Icon, title, description }) => (
   <motion.div 
@@ -39,18 +39,18 @@ const LandingPage = () => {
           <a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a>
         </div>
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => navigate('/login')}
-            className="px-6 py-2.5 rounded-full hover:bg-white/10 text-white font-medium transition-all"
+          <Link 
+            to="/login"
+            className="px-6 py-2.5 rounded-full hover:bg-white/10 text-white font-medium transition-all inline-block"
           >
             Sign In
-          </button>
-          <button 
-            onClick={() => navigate('/register')}
-            className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-medium backdrop-blur-md transition-all"
+          </Link>
+          <Link 
+            to="/register"
+            className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-medium backdrop-blur-md transition-all inline-block"
           >
             Register
-          </button>
+          </Link>
         </div>
       </nav>
 
@@ -73,12 +73,12 @@ const LandingPage = () => {
             Upload your resume, engage in realistic AI-driven mock interviews, and get instant personalized feedback to land your dream job.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
-            <button 
-              onClick={() => navigate('/register')}
-              className="w-full sm:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-primary to-secondary text-white font-semibold text-lg hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] transition-all flex items-center justify-center gap-2"
+            <Link 
+              to="/register"
+              className="w-full sm:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-primary to-secondary text-white font-semibold text-lg hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] transition-all flex items-center justify-center gap-2 inline-flex"
             >
               Start for free <ArrowRight className="w-5 h-5" />
-            </button>
+            </Link>
           </div>
         </motion.div>
 
