@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+
+# Disallow authenticated dashboard routes (private content)
+Disallow: /dashboard/
+
+Sitemap: https://ai-interview-preparation-platform-seven.vercel.app/sitemap.xml

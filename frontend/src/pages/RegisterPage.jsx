@@ -124,12 +124,13 @@ const RegisterPage = () => {
         <div className="glass-card p-8 rounded-2xl border border-white/10 shadow-xl backdrop-blur-xl">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Full Name</label>
+              <label htmlFor="reg-name" className="text-sm font-medium text-slate-300 ml-1">Full Name</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User className="h-5 w-5 text-slate-500" />
                 </div>
                 <input
+                  id="reg-name"
                   type="text"
                   name="name"
                   required
@@ -142,12 +143,13 @@ const RegisterPage = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Email Address</label>
+              <label htmlFor="reg-email" className="text-sm font-medium text-slate-300 ml-1">Email Address</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-slate-500" />
                 </div>
                 <input
+                  id="reg-email"
                   type="email"
                   name="email"
                   required
@@ -160,12 +162,13 @@ const RegisterPage = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Password</label>
+              <label htmlFor="reg-password" className="text-sm font-medium text-slate-300 ml-1">Password</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-slate-500" />
                 </div>
                 <input
+                  id="reg-password"
                   type="password"
                   name="password"
                   required
@@ -178,12 +181,13 @@ const RegisterPage = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Confirm Password</label>
+              <label htmlFor="reg-confirm-password" className="text-sm font-medium text-slate-300 ml-1">Confirm Password</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-slate-500" />
                 </div>
                 <input
+                  id="reg-confirm-password"
                   type="password"
                   name="confirmPassword"
                   required

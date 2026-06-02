@@ -443,8 +443,9 @@ const ResumeUpload = () => {
               {/* Answer Input */}
               <form onSubmit={handleAnswerSubmit} className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Your Answer</label>
+                  <label htmlFor="resume-answer" className="text-sm font-medium text-slate-300">Your Answer</label>
                   <textarea
+                    id="resume-answer"
                     required
                     rows={6}
                     value={currentAnswer}

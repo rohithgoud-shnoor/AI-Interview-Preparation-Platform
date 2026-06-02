@@ -1,5 +1,5 @@
 import React from 'react';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { AlertTriangle, TrendingUp, BookOpen } from 'lucide-react';
 
 const radarData = [
@@ -96,7 +96,7 @@ const Analytics = () => {
                 <Bar dataKey="score" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50}>
                   {
                     barData.map((entry, index) => (
-                      <cell key={`cell-${index}`} fill={index === barData.length - 1 ? '#9333ea' : '#3b82f6'} />
+                      <Cell key={`cell-${index}`} fill={index === barData.length - 1 ? '#9333ea' : '#3b82f6'} />
                     ))
                   }
                 </Bar>

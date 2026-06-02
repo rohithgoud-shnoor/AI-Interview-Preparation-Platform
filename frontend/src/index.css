@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
     @apply bg-background text-slate-200 antialiased selection:bg-primary/30 overflow-x-hidden;
   }
@@ -19,5 +25,10 @@
 
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary;
+  }
+
+  /* Mirrors the webcam feed so it looks like a real mirror */
+  .mirror {
+    transform: scaleX(-1);
   }
 }

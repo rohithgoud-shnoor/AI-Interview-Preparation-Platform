@@ -256,12 +256,13 @@ const Profile = () => {
               
               {/* Full Name */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Full Name</label>
+                <label htmlFor="profile-name" className="text-xs font-semibold uppercase tracking-wider text-slate-400">Full Name</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500">
                     <User className="w-4 h-4" />
                   </span>
                   <input
+                    id="profile-name"
                     type="text"
                     required
                     name="name"
@@ -275,12 +276,13 @@ const Profile = () => {
 
               {/* Email Address */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Email Address</label>
+                <label htmlFor="profile-email" className="text-xs font-semibold uppercase tracking-wider text-slate-400">Email Address</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500">
                     <Mail className="w-4 h-4" />
                   </span>
                   <input
+                    id="profile-email"
                     type="email"
                     required
                     name="email"
@@ -294,12 +296,13 @@ const Profile = () => {
 
               {/* Phone Number */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Phone Number</label>
+                <label htmlFor="profile-phone" className="text-xs font-semibold uppercase tracking-wider text-slate-400">Phone Number</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500">
                     <Phone className="w-4 h-4" />
                   </span>
                   <input
+                    id="profile-phone"
                     type="tel"
                     name="phone_number"
                     value={formData.phone_number}
@@ -312,12 +315,13 @@ const Profile = () => {
 
               {/* College Name */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">College / University</label>
+                <label htmlFor="profile-college" className="text-xs font-semibold uppercase tracking-wider text-slate-400">College / University</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500">
                     <School className="w-4 h-4" />
                   </span>
                   <input
+                    id="profile-college"
                     type="text"
                     name="college_name"
                     value={formData.college_name}
@@ -330,12 +334,13 @@ const Profile = () => {
 
               {/* Specialization */}
               <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Specialization / Domain</label>
+                <label htmlFor="profile-specialization" className="text-xs font-semibold uppercase tracking-wider text-slate-400">Specialization / Domain</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500">
                     <BookOpen className="w-4 h-4" />
                   </span>
                   <input
+                    id="profile-specialization"
                     type="text"
                     name="specialization"
                     value={formData.specialization}
